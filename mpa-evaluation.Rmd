@@ -17,7 +17,10 @@ library(networkD3)
 
 The MPA Atlas database was used to construct a list of fully-highly protected areas from which to search for public-facing management plans. Other databases were originally explored (World Database of Protected Areas, Protected Area Management Effectiveness Database) but did not provide a comprehensive list. 
 
-The emLab Google Drive has a few copies of the dataset, here is the link to the more recent version used: https://drive.google.com/drive/folders/12nyiEQ5rlKooNE9Oa99DAy5KFDgZjhzg?usp=sharing
+The emLab Google Drive has a few copies of the dataset, here is the link to their mpa-atlas folder:
+https://drive.google.com/drive/folders/1WpDmaNoosqNt7TbT-728vmeFUeaz4udW
+
+The two versions of the data needed in this exploration document are "MPAtlas_20200407" and "mpatlas_20201223_clean". Once downloaded into the project folder they are read directly here without any external modification. Versions have also been saved locally in case they are removed from the emLab drive in the future.
 
 ```{r read}
 # MPA Atlas downloaded from emlab Google Drive on April-07-2020 - original version used for this project
