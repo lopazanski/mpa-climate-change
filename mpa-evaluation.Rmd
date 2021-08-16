@@ -118,35 +118,38 @@ data_final <- data_rev %>%
 
 In addition to getting a newer version of the database, we also learned (Aug 2021 via email with Beth Pike) that the "fully/highly" list is only those that are coded as "All" no-take. Reviews of that list (1056 zones, code below) indicate that it may be too restrictive for our purposes; 54 of the already-reviewed management plans would be excluded.
 
+```{r}
+# Read search list:
+search_list <- read_csv("list-17jan2021.csv") # search list
+all_mp_id <- data.frame("plan_id" = c(1:152)) # numeric vector with all plan id's 1-152
+
+```
+
 ##### Option 1: Fully/Highly List - "All" and "Implemented"
 ```{r new list option 1}
 # Filter new version of MPA Atlas Database
 # Fully/Highly protected is just no_take == "All, Implemented
-fh <- atlas2_df %>% 
+option1 <- atlas2_df %>% 
   filter(no_take %in% c("All")) %>% 
   filter(implemente == 1) # 1056; close to current reported 1013 zones
-  
-# Compare the mpa_id's for the fully/highly list to the old search list
-fh_id <- unique(fh$mpa_id) # Unique mpa_id's for the fully/highly list
-search_list <- read_csv("list-17jan2021.csv") # search list
 
-# Are any of the areas "found" not included in the new list?
-old_found <- search_list %>% 
-  filter(search == "F") 
+# Overlap between the two lists
+overlap1 <- inner_join(option1, search_list, by = c("mpa_id"))  #840 overlapping areas
+overlap1_plans <- data.frame("plan_id" = as.numeric(unique(overlap1$plan_id[overlap1$search == "F"]))) #99/152 included
 
-found_now_excluded <- old_found %>% # 116 originally included zones are now excluded
-  filter(!(mpa_id %in% fh_id))
+# Extra areas not in original search
+extra1 <- option1 %>% 
+  filter(!(mpa_id %in% search_list$mpa_id)) #216 additional zones to "search" for
 
-found_still_included <- old_found %>% # 367 zones "found" still included
-  filter(mpa_id %in% fh_id)
+# Which plans are excluded 
+excluded1 <- all_mp_id %>% # 53 management plans now not included
+  filter(!(plan_id %in% overlap1_plans$plan_id))
 
-mp_included <- unique(found_still_included$plan_id)
-all_mp_id <- data.frame("mpa_id" = c(1:153))
+# What zones are in the old list that are not in the new list?
+left1 <- search_list %>% 
+  filter(!(mpa_id %in% overlap1$mpa_id)) # 85 zones not in new list
 
-mp_excluded <- all_mp_id %>% # 54 management plans now not included
-  filter(!(mpa_id %in% mp_included))
-
-# Since 54 already-reviewed plans are excluded, this may be too restrictive for our purposes
+# Since 53 already-reviewed plans are excluded, this may be too restrictive for our purposes
 ```
 
 ##### Option 2: Include "Part" or "All" and "Implemented"
@@ -158,15 +161,30 @@ option2 <- atlas2_df %>% #20933
 
 # Overlap between the two lists
 overlap2 <- inner_join(option2, search_list, by = c("mpa_id")) #1277 zones overlap
-overlap2_plans <- data.frame("plan_id" = as.numeric(unique(overlap2$plan_id[overlap2$search == "F"]))) 
+overlap2_plans <- data.frame("plan_id" = as.numeric(unique(overlap2$plan_id[overlap2$search == "F"]))) # 148 "found" plans
+
+##### 148 found plans - the four excluded are # 145, 146, 147, 150
 
 # Extra areas not in original search
 extra2<- option2 %>% 
-  filter(!(mpa_id %in% search_list$mpa_id)) #388
+  filter(!(mpa_id %in% search_list$mpa_id)) #388 additional zones to "search" for
 
-extra2_sov <- extra %>% 
-  group_by(sovereign) %>% 
-  count()
+# Excluded plans
+excluded2 <- all_mp_id %>% # 2 plans not included that were already reviewed
+  filter(!(plan_id %in% overlap2_plans$plan_id))
+
+# What zones are in the old list that are not in the new list?
+left2 <- search_list %>% 
+  filter(!(mpa_id %in% overlap2$mpa_id)) # 85 zones not in new list
+
+# Export combined search list for option 2 + original list
+search_list_refined <- search_list %>% 
+  mutate(original_search = "Y") %>% # add a new column for whether included in original search
+  select(mpa_id:network, sub_locati, marine, fishing_in, original_search)
+
+option2 <- option2 %>% mutate(new_list = "Y") # add a new column for included in new search
+
+combined_option_2 <- full_join(search_list_refined, option2, by = "mpa_id") #1786
 ```
 
 ##### Option 3: Include other no_take criteria
@@ -177,14 +195,14 @@ option3 <- atlas2_df %>% #20933
   filter(implemente == 1) %>%  # 1. Implemented (step matches old version) 17793 
   filter(no_take %in% c("Part", "All") | 
            (no_take == "Not Reported" & no_take_ar > 0) |
-           (no_take == "Not Reported" & fishing == "No")) # 3. No-take ... 1756
+           (no_take == "Not Reported" & fishing == "No"))  # 3. No-take ... 1756
 
 # What is the overlap between the old list and the new list?
 overlap3 <- inner_join(option3, search_list, by = c("mpa_id")) #1313 zones overlap 
 overlap3_plans <- data.frame("plan_id" = as.numeric(unique(overlap3$plan_id[overlap3$search == "F"]))) # 151/152 plans overlap
 
 # What zones are included in the new list that were not in the old list?
-extra3 <- overlap3 %>% 
+extra3 <- option3 %>% 
   filter(!(mpa_id %in% search_list$mpa_id)) # 443 zones not in original search
 
 # What zones are in the old list that are not in the new list?
@@ -194,6 +212,54 @@ left3 <- search_list %>%
 ### How many of those are found plans?
 left3_found <- left3 %>% filter(search == "F") # 11 missing zones with "found" plans 
 left3_found_mp <- unique(left3_found$plan_id) # those 11 correspond to 14, 15, 73, 106, 146
+
+
+excluded3 <- all_mp_id %>% # 2 plans not included that were already reviewed
+  filter(!(plan_id %in% overlap3_plans$plan_id))
+
+```
+
+##### Option 4: Include coastal/marine proxy
+```{r}
+# Filter new dataset
+option4 <- atlas2_df %>% #20933
+  filter(implemente == 1) %>%  # Implemented (step matches old version) 17793 
+  filter(no_take %in% c("Part", "All") | 
+           (no_take == "Not Reported" & no_take_ar > 0) |
+           (no_take == "Not Reported" & fishing == "No")) %>%  #  No-take ... 1756
+  filter(calc_m_are > 0 | rep_m_area > 0) # Coastal or Marine  1215
+
+# What is the overlap between the old list and the new list?
+overlap4 <- inner_join(option4, search_list, by = c("mpa_id")) #920 zones overlap 
+overlap4_plans <- data.frame("plan_id" = as.numeric(unique(overlap4$plan_id[overlap4$search == "F"]))) # 144/152 plans overlap
+
+# What zones are included in the new list that were not in the old list?
+extra4 <- option4 %>% 
+  filter(!(mpa_id %in% search_list$mpa_id)) # 295 zones not in original search
+
+# What zones are in the old list that are not in the new list?
+left4 <- search_list %>% 
+  filter(!(mpa_id %in% overlap4$mpa_id)) # 478 zones not in new list
+
+all_mp_id <- data.frame("plan_id" = c(1:153))
+
+excluded4 <- all_mp_id %>% # 9 management plans now not included
+  filter(!(plan_id %in% overlap4_plans$plan_id)) 
+```
+
+##### Compare the "Extra" areas among the different options
+```{r}
+add_part <- extra2 %>% filter(!(mpa_id %in% extra1$mpa_id)) # All 216 from "All" plus 172
+add_nt <- extra3 %>% filter(!(mpa_id %in% extra2$mpa_id)) # All 216 from "All" plus 172 from "Part" plus 55 
+add_cm1 <- extra4 %>% 
+  filter(mpa_id %in% extra1$mpa_id) # 148/216 from "All" 
+add_cm2 <- extra4 %>% 
+  filter(mpa_id %in% add_part$mpa_id)  # 119/172 from 'Part"
+add_cm3 <- extra4 %>% 
+  filter(mpa_id %in% add_nt$mpa_id) # 28/55 from extra no-take criteria
+
+# 148 areas are shared by all of the criteria: add_cm1
+
 
 ```
 
