@@ -27,7 +27,8 @@ The two versions of the data needed in this exploration document are "MPAtlas_20
 mpa_atlas <- read_sf(dsn = "MPAtlas_20200407", 
                      layer = "mpatlas_20200407_FullCalcs") %>% clean_names()
 
-# Received updated version from Juan Mayorga that he cleaned, Dec-23-2020:=
+# Received updated version from Juan Mayorga that he cleaned, Dec-23-2020:
+# Confirmed with Beth Pike in Aug 2021 that this version is still pretty up-to-date
 mpa_atlas2 <- read_sf(dsn = "mpatlas_20201223_clean",
                      layer = "mpatlas_20201223_clean") 
 
@@ -115,25 +116,84 @@ data_final <- data_rev %>%
 
 #### B. New Database Version (12/2020) 
 
-**Needs Review**
+In addition to getting a newer version of the database, we also learned (Aug 2021 via email with Beth Pike) that the "fully/highly" list is only those that are coded as "All" no-take. Reviews of that list (1056 zones, code below) indicate that it may be too restrictive for our purposes; 54 of the already-reviewed management plans would be excluded.
 
-```{r filter new database}
+##### Option 1: Fully/Highly List - "All" and "Implemented"
+```{r new list option 1}
 # Filter new version of MPA Atlas Database
-new_data <- atlas2_df %>% #20933
-  filter(implemente == 1) %>%  # 1. Implemented (step matches old version) 17793 
-  filter(rep_m_area != 0 | calc_m_are != 0) %>% # 2. Coastal or Marine (no category in updated version) 9196
-  filter(no_take %in% c("Part", "All") | no_take_ar != 0) # 3. No-take ... 1180?
+# Fully/Highly protected is just no_take == "All, Implemented
+fh <- atlas2_df %>% 
+  filter(no_take %in% c("All")) %>% 
+  filter(implemente == 1) # 1056; close to current reported 1013 zones
   
-# The new version diverges substantially as soon as the categories no longer match - filtering for "coastal or marine"
-# in the original version drops the observations from 13k to 11k, but attempting to replicate the same step in the new
-# version drops the observations from 17k to 9k. 
+# Compare the mpa_id's for the fully/highly list to the old search list
+fh_id <- unique(fh$mpa_id) # Unique mpa_id's for the fully/highly list
+search_list <- read_csv("list-17jan2021.csv") # search list
 
-# The no-take step (#3) is significantly different from the previous version because there is no "fishing" category.
+# Are any of the areas "found" not included in the new list?
+old_found <- search_list %>% 
+  filter(search == "F") 
 
-# Next steps:
-# Reach out to MPA Atlas folks to get clarification on how to filter to get the list of fully/highly protected areas
-# (email sent on July 22 2021) or just get the list. Don't waste more time examining what doesn't match; it's several
-# hundred cases on each side, and at least 100 cases where management plans were found.
+found_now_excluded <- old_found %>% # 116 originally included zones are now excluded
+  filter(!(mpa_id %in% fh_id))
+
+found_still_included <- old_found %>% # 367 zones "found" still included
+  filter(mpa_id %in% fh_id)
+
+mp_included <- unique(found_still_included$plan_id)
+all_mp_id <- data.frame("mpa_id" = c(1:153))
+
+mp_excluded <- all_mp_id %>% # 54 management plans now not included
+  filter(!(mpa_id %in% mp_included))
+
+# Since 54 already-reviewed plans are excluded, this may be too restrictive for our purposes
+```
+
+##### Option 2: Include "Part" or "All" and "Implemented"
+```{r new list option 2}
+# Examine overlap and exclusions if include both "part" and "all" for no_take
+option2 <- atlas2_df %>% #20933
+  filter(implemente == 1) %>%  # 1. Implemented (step matches old version) 17793 
+  filter(no_take %in% c("Part", "All")) # 2. Part or All no-take 1665
+
+# Overlap between the two lists
+overlap2 <- inner_join(option2, search_list, by = c("mpa_id")) #1277 zones overlap
+overlap2_plans <- data.frame("plan_id" = as.numeric(unique(overlap2$plan_id[overlap2$search == "F"]))) 
+
+# Extra areas not in original search
+extra2<- option2 %>% 
+  filter(!(mpa_id %in% search_list$mpa_id)) #388
+
+extra2_sov <- extra %>% 
+  group_by(sovereign) %>% 
+  count()
+```
+
+##### Option 3: Include other no_take criteria
+
+```{r new list option 3}
+# Filter new dataset
+option3 <- atlas2_df %>% #20933
+  filter(implemente == 1) %>%  # 1. Implemented (step matches old version) 17793 
+  filter(no_take %in% c("Part", "All") | 
+           (no_take == "Not Reported" & no_take_ar > 0) |
+           (no_take == "Not Reported" & fishing == "No")) # 3. No-take ... 1756
+
+# What is the overlap between the old list and the new list?
+overlap3 <- inner_join(option3, search_list, by = c("mpa_id")) #1313 zones overlap 
+overlap3_plans <- data.frame("plan_id" = as.numeric(unique(overlap3$plan_id[overlap3$search == "F"]))) # 151/152 plans overlap
+
+# What zones are included in the new list that were not in the old list?
+extra3 <- overlap3 %>% 
+  filter(!(mpa_id %in% search_list$mpa_id)) # 443 zones not in original search
+
+# What zones are in the old list that are not in the new list?
+left3 <- search_list %>% 
+  filter(!(mpa_id %in% overlap3$mpa_id)) # 85 zones not in new list
+
+### How many of those are found plans?
+left3_found <- left3 %>% filter(search == "F") # 11 missing zones with "found" plans 
+left3_found_mp <- unique(left3_found$plan_id) # those 11 correspond to 14, 15, 73, 106, 146
 
 ```
 
