@@ -247,6 +247,90 @@ excluded4 <- all_mp_id %>% # 9 management plans now not included
   filter(!(plan_id %in% overlap4_plans$plan_id)) 
 ```
 
+
+##### Option 5: Include "is mpa" proxy
+```{r}
+# Filter new dataset
+option5 <- atlas2_df %>% #20933
+  filter(implemente == 1) %>%  # Implemented (step matches old version) 17793 
+  filter(no_take %in% c("Part", "All") | 
+           (no_take == "Not Reported" & no_take_ar > 0) |
+           (no_take == "Not Reported" & fishing == "No")) %>%  #  No-take ... 1756
+  filter(is_mpa == 1) # Coastal or Marine  1673
+
+# What is the overlap between the old list and the new list?
+overlap5 <- inner_join(option5, search_list, by = c("mpa_id")) #1313 zones overlap 
+overlap5_plans <- data.frame("plan_id" = as.numeric(unique(overlap5$plan_id[overlap5$search == "F"]))) # 151/152 plans overlap
+
+# What zones are included in the new list that were not in the old list?
+extra5 <- option5 %>% 
+  filter(!(mpa_id %in% search_list$mpa_id)) # 360 zones not in original search
+
+# What zones are in the old list that are not in the new list?
+ left5 <- search_list %>% 
+  filter(!(mpa_id %in% overlap5$mpa_id)) # 478 zones not in new list
+
+excluded5 <- all_mp_id %>% # 9 management plans now not included
+  filter(!(plan_id %in% overlap5_plans$plan_id)) 
+```
+
+##### Option 6: Include "is mpa" proxy but only part/all 
+```{r}
+# Filter new dataset
+option6 <- atlas2_df %>% #20933
+  filter(implemente == 1) %>%  # Implemented (step matches old version) 17793 
+  filter(no_take %in% c("Part", "All")) %>%  #  No-take 
+  filter(is_mpa == 1) # Is mpa #1592
+
+# What is the overlap between the old list and the new list?
+overlap6 <- inner_join(option6, search_list, by = c("mpa_id")) #1313 zones overlap 
+overlap6_plans <- data.frame("plan_id" = as.numeric(unique(overlap6$plan_id[overlap6$search == "F"]))) # 151/152 plans overlap
+
+# What zones are included in the new list that were not in the old list?
+extra6 <- option6 %>% 
+  filter(!(mpa_id %in% search_list$mpa_id)) # 360 zones not in original search
+
+# What zones are in the old list that are not in the new list?
+left6 <- search_list %>% 
+  filter(!(mpa_id %in% overlap6$mpa_id)) # 478 zones not in new list
+
+excluded6 <- all_mp_id %>% # 9 management plans now not included
+  filter(!(plan_id %in% overlap6_plans$plan_id)) 
+```
+
+##### Option 7: Include "is mpa" proxy but only part/all 
+```{r}
+# Filter new dataset
+option7 <- atlas2_df %>% #20933
+  filter(implemente == 1) %>%  # Implemented (step matches old version) 17793 
+  filter(no_take %in% c("Part", "All")) %>%  #  No-take 
+  filter(is_mpa == 1) %>%  # Is mpa #1592
+  filter(calc_m_are > 0 | rep_m_area > 0) #1087
+
+# What is the overlap between the old list and the new list?
+overlap7 <- inner_join(option7, search_list, by = c("mpa_id")) #1313 zones overlap 
+overlap7_plans <- data.frame("plan_id" = as.numeric(unique(overlap7$plan_id[overlap7$search == "F"]))) # 151/152 plans overlap
+
+# What zones are included in the new list that were not in the old list?
+extra7 <- option7 %>% 
+  filter(!(mpa_id %in% search_list$mpa_id)) # 360 zones not in original search
+
+# What zones are in the old list that are not in the new list?
+left7 <- search_list %>% 
+  filter(!(mpa_id %in% overlap7$mpa_id)) # 478 zones not in new list
+
+left_new7 <- atlas2_df %>% 
+  filter(mpa_id %in% left7$mpa_id)
+
+excluded7 <- all_mp_id %>% # 9 management plans now not included
+  filter(!(plan_id %in% overlap7_plans$plan_id)) 
+
+# This is probably not worth it - only leads to 6 fewer additional plans to review
+
+
+```
+
+
 ##### Compare the "Extra" areas among the different options
 ```{r}
 add_part <- extra2 %>% filter(!(mpa_id %in% extra1$mpa_id)) # All 216 from "All" plus 172
@@ -258,9 +342,33 @@ add_cm2 <- extra4 %>%
 add_cm3 <- extra4 %>% 
   filter(mpa_id %in% add_nt$mpa_id) # 28/55 from extra no-take criteria
 
+add_ismpa1 <- extra5 %>% 
+  filter(mpa_id %in% extra1$mpa_id) #197/216 from "All"
+add_ismpa2 <- extra5 %>% # 118/172 from "Part"
+  filter(mpa_id %in% add_part$mpa_id)
+add_ismpa3 <- extra5 %>% #45/55 from extra no-take criteria
+  filter(mpa_id %in% add_nt$mpa_id)
+
+op6_1 <- extra6 %>% 
+  filter(mpa_id %in% extra1$mpa_id) #197
+op6_2 <- extra6 %>% 
+  filter(mpa_id %in% add_part$mpa_id) #118
+  
+
+  
+# Which of the "All" no take areas get knocked out by the "is_mpa" criteria?
+all_notmpa <- extra1 %>% 
+  filter(!(mpa_id %in% extra5$mpa_id))
+# Some make sense, some don't - PIPA entry, Tubbataha Reef entry, some Red Hind Spawning Areas, others
+
 # 148 areas are shared by all of the criteria: add_cm1
+write.csv(add_cm1, "export-addcm1-148.csv")
+temp <- extra6 %>% 
+  filter(!(mpa_id %in% add_cm1$mpa_id))
+write.csv(temp, "extra-op6.csv")
 
-
+temp2 <- add_cm1 %>% 
+  filter(!(mpa_id %in% extra6$mpa_id))
 ```
 
 
