@@ -594,6 +594,15 @@ ggplot(data = data, aes(x = cc_threat)) +
 
 ```
 
+##### *How many AREAS mention climate change?*
+
+```{r}
+ggplot(data = all, aes(x = cc_threat)) +
+  geom_bar()+
+  geom_text(stat = "count", aes(label =..count..), vjust = -0.5)
+```
+
+
 ##### *Does mention of climate change increase/decrease by year?* 
 ```{r}
 threat <- data %>% 
