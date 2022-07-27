@@ -34,14 +34,13 @@ plan_data <- readRDS(file.path(data.dir, "exported-plan-metadata.Rds")) %>%
   rename(name_plan = name,
          country_plan = country)
 
-# Process Data ------------------------------------------------------------------
+# Process Data -----------------------------------------------------------------
 search_clean <- search %>% 
   rename(name_search = name) %>% 
-  mutate(plan_id_numeric = if_else(is.numeric(plan_id), plan_id, NA))
+  rename(network_from_mp = network)
 
 
-# Build Data ------------------------------------------------------------------
-
+# Build Data -------------------------------------------------------------------
 
 ## Filter atlas data for those in our search
 atlas_subset <- atlas %>% 
@@ -53,7 +52,10 @@ atlas_subset <- atlas %>%
     # mpa_id's and therefore okay to exclude.
 
 ## Join atlas data with our search information
-atlas_search <- left_join(atlas_subset, search)
+atlas_search <- left_join(atlas_subset, search_clean)
 
 ## Join atlas/search combo with plan metadata
 atlas_all <- left_join(atlas_search, plan_data, by = "plan_id")
+
+# Export -----------------------------------------------------------------------
+saveRDS(atlas_all, file.path(out.dir, "processed-area-metadata.Rds"))

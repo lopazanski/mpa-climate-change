@@ -8,7 +8,6 @@ rm(list = ls())
 
 # Packages
 library(tidyverse)
-library(googlesheets4)
 
 # Directories
 drive.dir <- "/Volumes/GoogleDrive/My Drive/Research/MPA Climate Change - Conservation International/mpa-climate-change-review"
