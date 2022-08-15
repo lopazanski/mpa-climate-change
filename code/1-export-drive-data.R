@@ -56,7 +56,7 @@ saveRDS(plans, file = file.path(data.dir, "exported-plan-metadata.Rds"))
 ## Read document review ----
 review <- read_sheet("https://docs.google.com/spreadsheets/d/1lqxaoukY0-k0a5mu5-Zjx-dtHjnPIgYzYkIsnGCudFQ/edit#gid=452132598",
                      sheet = "additional-collection", 
-                     trim_ws = T, 
+                     trim_ws = T, na = c("NA", "NS", ""), col_types = "c",
                      .name_repair = "minimal")
 
 review <- as.data.frame(review) 

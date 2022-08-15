@@ -40,7 +40,7 @@ data <- review_t %>%
   # Drop old ID rows
   filter(Q_1 != "name") %>% 
   # Add identifier columns
-  mutate(plan_id = rep(1:174, each = 2)) %>% 
+  mutate(plan_id = rep(1:175, each = 2)) %>% 
   select(plan_id, Q_1:Q_82) 
 
 # Remove row names
@@ -70,6 +70,17 @@ review_long <- data %>%
 
 # Match review to key 
 data <- left_join(review_long, key_detailed)
+
+# Changes to the data -------------------------------------------------------
+
+# Exclude the two NZ conservation management strategies
+data <- data %>% 
+  filter(!(plan_id %in% c(173, 174)))
+
+# Exclude Rickett's Point (Plan = 128) because plan was revoked
+data <- data %>% 
+  filter(!(plan_id == 128))
+
 
 
 # Export processed data -------------------------------------------------------

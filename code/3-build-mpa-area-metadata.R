@@ -57,5 +57,11 @@ atlas_search <- left_join(atlas_subset, search_clean)
 ## Join atlas/search combo with plan metadata
 atlas_all <- left_join(atlas_search, plan_data, by = "plan_id")
 
+# Changes to Data --------------------------------------------------------------
+
+# Update F-AI (found, already included) to just "found"
+atlas_all$search[atlas_all$search == "F-AI"] = "F"
+
+
 # Export -----------------------------------------------------------------------
 saveRDS(atlas_all, file.path(out.dir, "processed-area-metadata.Rds"))
