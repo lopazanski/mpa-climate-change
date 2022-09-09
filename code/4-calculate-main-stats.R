@@ -31,12 +31,11 @@ review_stat_wide <- review_stat %>%
 area %>% 
   group_by() %>% 
   summarize(n_areas_search = n_distinct(mpa_id), # areas meeting critera
-            n_plans = n_distinct(plan_id), # num plans included
+            n_plans = n_distinct(area$plan_id[area$search == "F"]), # num plans included
             n_areas_w_plans = n_distinct(area$mpa_id[area$search == "F"])) # areas covered by plans
 
 ## Number of areas for each plan ----
-area  %>% 
-  filter(search == "F") %>% 
+area_found  %>% 
   group_by(plan_id) %>% 
   summarize(n_areas = n_distinct(mpa_id)) %>% 
   filter(n_areas > 1) %>% 
@@ -45,8 +44,7 @@ area  %>%
             max_areas = max(n_areas)) # max n areas in one plan
 
 ## Geography ----
-area %>%
-  filter(search == "F") %>%
+area_found %>%
   group_by() %>%
   summarize(n_countries = n_distinct(country),
             earliest_year = min(mp_year, na.rm = T),
@@ -65,6 +63,14 @@ area_found %>%
 #   group_by(country) %>%
 #   summarize(n_areas = n(),
 #             n_plans = n_distinct(plan_id))
+
+## Languages ----
+review_stat %>% 
+  filter(type == "stat" & q_code == "metadata_language") %>% 
+  group_by(entry) %>% 
+  summarize(count = n()) %>% 
+  ungroup() %>% 
+  mutate(proportion = count/sum(count))
 
 # Size Classes -----------------------------------------------------------------
 

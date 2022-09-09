@@ -8,6 +8,9 @@
 library(tidyverse)
 library(googlesheets4)
 
+# Clear workspace
+rm(list = ls())
+
 # Directories
 drive.dir <- "/Volumes/GoogleDrive/My Drive/Research/MPA Climate Change - Conservation International/mpa-climate-change-review"
 data.dir <- here::here("data", "raw-ish")

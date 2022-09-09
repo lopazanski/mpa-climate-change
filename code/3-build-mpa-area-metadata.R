@@ -34,6 +34,9 @@ plan_data <- readRDS(file.path(data.dir, "exported-plan-metadata.Rds")) %>%
   rename(name_plan = name,
          country_plan = country)
 
+## Processed document review
+review  <- readRDS(file.path("data", "processed", "processed-doc-review.Rds"))
+
 # Process Data -----------------------------------------------------------------
 search_clean <- search %>% 
   rename(name_search = name) %>% 
@@ -62,6 +65,10 @@ atlas_all <- left_join(atlas_search, plan_data, by = "plan_id")
 # Update F-AI (found, already included) to just "found"
 atlas_all$search[atlas_all$search == "F-AI"] = "F"
 
+# Convert any plans removed from the processed document review as "NI"
+data <- atlas_all %>% 
+  mutate(search = if_else(!(plan_id %in% review$plan_id) & !(is.na(plan_id)), 
+                          "NI", search))
 
 # Export -----------------------------------------------------------------------
-saveRDS(atlas_all, file.path(out.dir, "processed-area-metadata.Rds"))
+saveRDS(data, file.path(out.dir, "processed-area-metadata.Rds"))
