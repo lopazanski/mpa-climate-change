@@ -9,7 +9,6 @@ rm(list = ls())
 # Packages
 library(tidyverse)
 
-
 # Directories
 drive.dir <- "/Volumes/GoogleDrive/My Drive/Research/MPA Climate Change - Conservation International/mpa-climate-change-review"
 data.dir <- here::here("data", "raw-ish")
@@ -50,14 +49,18 @@ rownames(data) = NULL
 # Add categories to question key
 key_detailed <- q_key %>% 
   mutate(q_num = as.numeric(str_remove(q_id, "Q_"))) %>% 
-  mutate(category = case_when(q_num %in% c(1:6, 80:83) ~ "metadata",
+  mutate(category = factor(case_when(q_num %in% c(1:6, 80:83) ~ "metadata",
                               q_num %in% c(7:12) ~ "climate",
                               q_num %in% c(13:30) ~ "objectives",
                               q_num %in% c(31:33) ~ "assessment",
-                              q_num %in% c(34:47) ~ "design",
+                              q_num %in% c(34:43) ~ "design",
+                              q_num %in% c(44:47) ~ "adaptive design",
                               q_num %in% c(50:59) ~ "monitoring",
-                              q_num %in% c(62:79) ~ "threats",
-                              q_num %in% c(48, 49, 60, 61) ~ "management"))
+                              q_num %in% c(62:79) ~ "management",
+                              q_num %in% c(48, 49, 60, 61) ~ "management"),
+                           levels = c("metadata", "climate",
+                                      "objectives","assessment",
+                                      "design", "adaptive design", "monitoring", "management")))
 
 # Lengthen review
 review_long <- data %>% 

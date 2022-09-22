@@ -89,8 +89,22 @@ area_stats <- area_found %>%
                                        between(area_calc, 10, 100) ~ "Small",
                                        area_calc < 10 ~ "Very Small"),
                              levels = c("Very Small", "Small",
-                                        "Large","Very Large")))
+                                        "Large","Very Large"))) 
 
+test <- area_stats %>% 
+  group_by(plan_id) %>% 
+  summarize(area_calc = sum(area_calc)) %>% 
+  ungroup() %>% 
+  mutate(size_class = factor(case_when(area_calc > 100000 ~ "Very Large",
+                                       between(area_calc, 100, 100000) ~ "Large",
+                                       between(area_calc, 10, 100) ~ "Small",
+                                       area_calc < 10 ~ "Very Small"),
+                             levels = c("Very Small", "Small",
+                                        "Large","Very Large")))%>% 
+  group_by(size_class) %>% 
+  summarize(n = n())
+  
+  
 ggplot() +
   geom_bar(data = area_stats,
            aes(x = size_class)) +
