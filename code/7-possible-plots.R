@@ -18,10 +18,15 @@ review  <- readRDS(file.path(data.dir, "processed-doc-review.Rds"))
 
 # Build Data -------------------------------------------------------------------
 review_stat <- review[review$type == "stat",]
+review_stat$entry[review_stat$q_code == "design_type" & is.na(review_stat$entry)] <- 0
 
-review_stat_wide <- review_stat %>% 
-  pivot_wider(names_from = q_code, values_from = entry, id_cols = plan_id) %>% 
-  mutate(across(.cols = c("climate_mention":"threat_habitat_cc"), .fns = as.numeric))
+review_stat <- review_stat %>% 
+  mutate(entry = if_else(entry %in% c("Planned", 1), 1, 0))
+
+review_stat_wide <- review_stat %>%
+  pivot_wider(names_from = q_code, values_from = entry, id_cols = plan_id) 
+
+vis_dat(review_stat_wide)
 
 # Create combined threat awareness, strategy, climate change column: 
 new_threat <- review_stat_wide %>% 
@@ -60,11 +65,8 @@ all <- review_stat %>%
   rbind(new_threat) %>% 
   rbind(new_assess) %>% 
   rbind(new_mgmt)
-#%>% 
- # mutate(entry = if_else(entry %in% c("Planned", 1, NA), 1, 0))
 
 all_stats <- all %>% 
-  mutate(entry = if_else(entry %in% c("Planned", 1, NA), 1, 0)) %>% 
   group_by(category, q_code, entry) %>% 
   summarize(n = n(),
             pct = round(n/171*100, 1)) 

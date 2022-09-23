@@ -25,6 +25,11 @@ review_stat <- review[review$type == "stat",]
 review_stat_wide <- review_stat %>% 
   pivot_wider(names_from = q_code, values_from = entry, id_cols = plan_id)
 
+plan_region <- area_found %>% 
+  select(plan_id, region) %>% 
+  distinct()
+
+saveRDS(plan_region, file.path("data", "plan-region-id.Rds"))
 # Stats for Manuscript ---------------------------------------------------------
 
 ## General areas and plans included ----
@@ -58,6 +63,13 @@ area_found %>%
   summarize(n_zones = n(),
             n_plans = n_distinct(plan_id))
 
+
+## Major subregions ----
+area_found %>%
+  group_by(region, subregion) %>%
+  summarize(n_zones = n(),
+            n_plans = n_distinct(plan_id)) %>% print(n = 33)
+
 ## Stats for each country -----
 # country_stats <- area_found %>%
 #   group_by(country) %>%
@@ -70,7 +82,8 @@ review_stat %>%
   group_by(entry) %>% 
   summarize(count = n()) %>% 
   ungroup() %>% 
-  mutate(proportion = count/sum(count))
+  mutate(proportion = count/sum(count)) %>% 
+  arrange(-count)
 
 # Size Classes -----------------------------------------------------------------
 
@@ -103,8 +116,8 @@ test <- area_stats %>%
                                         "Large","Very Large")))%>% 
   group_by(size_class) %>% 
   summarize(n = n())
-  
-  
+
+
 ggplot() +
   geom_bar(data = area_stats,
            aes(x = size_class)) +
