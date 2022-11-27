@@ -45,7 +45,7 @@ review_stat %>%
   pivot_wider(names_from = q_code, values_from = entry, id_cols = plan_id) %>% 
   mutate_if(is.character, as.numeric) %>% 
   mutate(total_climate = rowSums(across(climate_mention:monitor_exp_any))) %>% 
-  filter(total_climate > 0) %>% 
+  filter(total_climate > 0) %>%  
   group_by(total_climate) %>% 
   summarize(mention_score = n()) %>% 
   ungroup() %>% 

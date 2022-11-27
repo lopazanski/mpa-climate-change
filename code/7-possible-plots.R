@@ -26,7 +26,6 @@ review_stat <- review_stat %>%
 review_stat_wide <- review_stat %>%
   pivot_wider(names_from = q_code, values_from = entry, id_cols = plan_id) 
 
-vis_dat(review_stat_wide)
 
 # Create combined threat awareness, strategy, climate change column: 
 new_threat <- review_stat_wide %>% 

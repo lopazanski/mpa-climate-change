@@ -16,8 +16,8 @@ data.dir <- file.path("data", "processed")
 
 # Read Data -------------------------------------------------------------------
 review  <- readRDS(file.path(data.dir, "processed-doc-review.Rds"))
-area_sf <- readRDS(file.path(data.dir, "processed-area-metadata.Rds")) %>% 
-  
+area_sf <- readRDS(file.path(data.dir, "processed-area-metadata.Rds")) 
+plan_region <- readRDS(file.path("data", "plan-region-id.Rds"))
 
 # Build Data -------------------------------------------------------------------
 review_stat <- review[review$type == "stat",]

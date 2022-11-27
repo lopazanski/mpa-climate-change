@@ -29,7 +29,8 @@ plan_region <- area_found %>%
   select(plan_id, region) %>% 
   distinct()
 
-saveRDS(plan_region, file.path("data", "plan-region-id.Rds"))
+#saveRDS(plan_region, file.path("data", "plan-region-id.Rds"))
+
 # Stats for Manuscript ---------------------------------------------------------
 
 ## General areas and plans included ----
