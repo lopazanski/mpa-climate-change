@@ -20,18 +20,21 @@ area_sf <- readRDS(file.path(data.dir, "processed-area-metadata.Rds"))
 plan_region <- readRDS(file.path("data", "plan-region-id.Rds"))
 
 # Build Data -------------------------------------------------------------------
+# Stat only df (no text detail)
 review_stat <- review[review$type == "stat",]
+
+# Replace NAs for design type with zeroes
 review_stat$entry[review_stat$q_code == "design_type" & is.na(review_stat$entry)] <- 0
 
+# Replace "planned" values with ones
 review_stat <- review_stat %>% 
   mutate(entry = if_else(entry %in% c("Planned", 1), 1, 0))
 
+# Widen stat df (each plan is a row)
 review_stat_wide <- review_stat %>%
   pivot_wider(names_from = q_code, values_from = entry, id_cols = plan_id) 
 
-vis_dat(review_stat_wide)
-
-# Plan ID & Name Dataframe
+# Create df with plan and name
 names <- review %>% 
   select(plan_id, name) %>% 
   distinct() %>% 
@@ -52,6 +55,8 @@ new_threat <- review_stat_wide %>%
   pivot_longer(cols = 2:4, names_to = "q_code", values_to = "entry") %>% 
   mutate(category = factor("management", levels = c("metadata", "climate", "objectives","assessment",
                                                     "design", "adaptive design", "monitoring", "management")))
+
+new_threat$category[new_threat$q_code == "threat_any_combined"] <- "assessment"
 
 # Create combined assessment column (cc or otherwise):
 new_assess <- review_stat_wide %>% 
@@ -80,11 +85,11 @@ all <- review_stat %>%
 
 top_vars <- c("climate_plan", "climate_action", "climate_mention",
               "obj_mgmt_any", "obj_cc_any", "obj_lt_any",
-              "assess_any_combined", "assess_climate",
+              "threat_any_combined", "assess_any_combined", "assess_climate",
               "design_adaptive_climate", "design_adaptive_fully", "design_adaptive_zoning", "design_adaptive_any",
               "mgmt_adapt", "design_cc_any", "design_resilience", "design_any",
               "monitor_any", "monitor_sci", "monitor_soc", "monitor_exp_any",
-              "threat_cc_combined", "threat_strat_combined", "threat_any_combined")
+              "threat_cc_combined", "threat_strat_combined")
 
 
 # Define Awareness/Action/Climate Levels ---------------------------------------
@@ -105,11 +110,14 @@ condensed <- all %>%
   filter(q_code %in% top_vars) %>%
   # Drop the social monitoring and adaptive design types
   filter(!(q_code %in% c("monitor_soc", "design_adaptive_zoning", 
-                         "design_adaptive_fully", "threat_any_combined"))) %>% 
+                         "design_adaptive_fully"))) %>% 
   mutate(level = case_when(q_code %in% climate_vars ~ "Climate Action",
                            q_code %in% action_vars ~ "Recommended Action",
                            q_code %in% aware_vars ~ "General Management Awareness")) %>% 
   mutate(level = factor(level, levels = c("General Management Awareness", "Recommended Action", "Climate Action")))
+
+condensed$category[condensed$category == "adaptive design"] <- "design"
+
 
 condensed_summary <- condensed %>% 
   group_by(plan_id, category) %>% 
@@ -118,8 +126,8 @@ condensed_summary <- condensed %>%
               names_from = category, 
               values_from = total) %>% 
   ungroup() %>% 
-  mutate(assessment = if_else(assessment > 0, assessment + 1, 0)) %>% 
-  mutate(`adaptive design` = if_else(`adaptive design` > 0, `adaptive design` + 1, 0)) %>% 
+  #mutate(assessment = if_else(assessment > 0, assessment + 1, 0)) %>% 
+  #mutate(`adaptive design` = if_else(`adaptive design` > 0, `adaptive design` + 1, 0)) %>% 
   full_join(., names, by = "plan_id") %>% 
   select(-plan_id, -name) %>% 
   mutate(total = rowSums(across(climate:management))) %>% 
@@ -128,10 +136,10 @@ condensed_summary <- condensed %>%
                names_to = "indicator",
                values_to = "entry") %>%
   filter(!(entry == 0)) %>% 
+  mutate(entry = if_else(entry > 3, 3, entry)) %>% 
   mutate(entry = as.factor(entry)) %>% 
   mutate(indicator = factor(indicator, 
-                            levels = c("climate","objectives", "assessment", "design", 
-                                                  "adaptive design", "monitoring", "management")))
+                            levels = c("climate","objectives", "assessment", "design", "monitoring", "management")))
 
 
 # Plot -------
@@ -153,9 +161,11 @@ theme1 <- theme(axis.text=element_text(size=5),
                 #legend.background = element_rect(fill=alpha('blue', 0)))
 ggplot() +
   geom_tile(data = condensed_summary,
-            aes(x = indicator, y = name_short, fill = entry)) +
-  scale_fill_manual(values = c("#9ECAE1", "#4292C6", "#08519C")) +
+            aes(x = indicator, y = name_short, fill = entry), show.legend = F) +
+  scale_fill_manual(values = c("#c9daf8", "#6d9eeb", "#1155CC")) +
   ggh4x::facet_nested(region~., scales = "free", space = "free") +
-  labs(fill = "1 - awareness\n2 - action\n3 - climate action") +
+  #labs(fill = "1 - awareness\n2 - action\n3 - climate action") +
   theme1
+
+ggsave("pacific_mpas.png", width = 6, height = 4, dpi = 300)
 

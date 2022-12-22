@@ -53,14 +53,13 @@ key_detailed <- q_key %>%
                               q_num %in% c(7:12) ~ "climate",
                               q_num %in% c(13:30) ~ "objectives",
                               q_num %in% c(31:33) ~ "assessment",
-                              q_num %in% c(34:43) ~ "design",
-                              q_num %in% c(44:47) ~ "adaptive design",
+                              q_num %in% c(34:47) ~ "design",
                               q_num %in% c(50:59) ~ "monitoring",
                               q_num %in% c(62:79) ~ "management",
                               q_num %in% c(48, 49, 60, 61) ~ "management"),
                            levels = c("metadata", "climate",
                                       "objectives","assessment",
-                                      "design", "adaptive design", "monitoring", "management")))
+                                      "design", "monitoring", "management")))
 
 # Lengthen review
 review_long <- data %>% 

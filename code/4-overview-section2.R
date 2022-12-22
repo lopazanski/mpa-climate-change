@@ -10,6 +10,7 @@ rm(list = ls())
 # Packages
 library(tidyverse)
 library(sf)
+library(gt)
 
 # Directories
 data.dir <- file.path("data", "processed")
@@ -19,17 +20,19 @@ area_sf <- readRDS(file.path(data.dir, "processed-area-metadata.Rds"))
 review  <- readRDS(file.path(data.dir, "processed-doc-review.Rds"))
 
 # Build Data -------------------------------------------------------------------
+# Drop geometry
 area <- area_sf %>% sf::st_drop_geometry()
+
+# New df for only the MPA areas that we found plans for
 area_found <- area[area$search == "F",]
+
+# New df only including stat (not text detail)
 review_stat <- review[review$type == "stat",]
+
+# Widen stats (every MP is a row)
 review_stat_wide <- review_stat %>% 
   pivot_wider(names_from = q_code, values_from = entry, id_cols = plan_id)
 
-plan_region <- area_found %>% 
-  select(plan_id, region) %>% 
-  distinct()
-
-#saveRDS(plan_region, file.path("data", "plan-region-id.Rds"))
 
 # Stats for Manuscript ---------------------------------------------------------
 
@@ -40,7 +43,7 @@ area %>%
             n_plans = n_distinct(area$plan_id[area$search == "F"]), # num plans included
             n_areas_w_plans = n_distinct(area$mpa_id[area$search == "F"])) # areas covered by plans
 
-## Number of areas for each plan ----
+## Number of plans with multiple areas ----
 area_found  %>% 
   group_by(plan_id) %>% 
   summarize(n_areas = n_distinct(mpa_id)) %>% 
@@ -55,27 +58,21 @@ area_found %>%
   summarize(n_countries = n_distinct(country),
             earliest_year = min(mp_year, na.rm = T),
             average_year = mean(mp_year, na.rm = T),
-            n_last_decade = n_distinct(plan_id[mp_year > 2009])/n_distinct(plan_id))
+            pct_last_decade = n_distinct(plan_id[mp_year > 2009])/n_distinct(plan_id))
 
 
 ## Major ocean basins (region) ----
 area_found %>%
   group_by(region) %>%
   summarize(n_zones = n(),
-            n_plans = n_distinct(plan_id))
-
+            n_plans = n_distinct(plan_id)) 
 
 ## Major subregions ----
-area_found %>%
-  group_by(region, subregion) %>%
-  summarize(n_zones = n(),
-            n_plans = n_distinct(plan_id)) %>% print(n = 33)
+# area_found %>%
+#   group_by(region, subregion) %>%
+#   summarize(n_zones = n(),
+#             n_plans = n_distinct(plan_id)) %>% print(n = 33)
 
-## Stats for each country -----
-# country_stats <- area_found %>%
-#   group_by(country) %>%
-#   summarize(n_areas = n(),
-#             n_plans = n_distinct(plan_id))
 
 ## Languages ----
 review_stat %>% 
@@ -83,12 +80,27 @@ review_stat %>%
   group_by(entry) %>% 
   summarize(count = n()) %>% 
   ungroup() %>% 
-  mutate(proportion = count/sum(count)) %>% 
-  arrange(-count)
+  mutate(proportion = round(count/sum(count), 3)) %>% 
+  arrange(-count)%>% 
+  mutate(entry = str_to_sentence(entry)) %>% 
+  gt() %>% 
+  tab_header(title = md("**Table X.** Languages included in management plan review")) %>% 
+  cols_label(entry = "Language",
+             count = "Number of Management Plans",
+             proportion = "Proportion") %>% 
+  cols_align(columns = 2:3, "center") %>% 
+  opt_table_font(font = list(google_font("Arial"))) %>% 
+  tab_options(
+    table.border.top.color = "transparent",
+    table.border.bottom.color = "transparent",
+    column_labels.border.top.color = "transparent",
+    column_labels.border.top.width = px(3),
+    heading.align = "left",
+    data_row.padding = px(3))
 
-# Size Classes -----------------------------------------------------------------
+## Size Classes ----------------------------------------------------------------
 
-## Add size class ----
+### Add size class ----
 area_calc <- area_sf %>%
   filter(mpa_id %in% area_found$mpa_id) %>%
   st_make_valid() %>%
@@ -104,8 +116,8 @@ area_stats <- area_found %>%
                                        area_calc < 10 ~ "Very Small"),
                              levels = c("Very Small", "Small",
                                         "Large","Very Large"))) 
-
-test <- area_stats %>% 
+### Number of plans in each size class ----
+area_stats %>% 
   group_by(plan_id) %>% 
   summarize(area_calc = sum(area_calc)) %>% 
   ungroup() %>% 
@@ -119,18 +131,11 @@ test <- area_stats %>%
   summarize(n = n())
 
 
-ggplot() +
-  geom_bar(data = area_stats,
-           aes(x = size_class)) +
-  labs(x = "MPA size class",
-       y = "number of zones")
-
-
-## Total area covered by review ----
-plan_area <- area_stats %>% 
+### Total area covered by review ----
+area_stats %>% 
   group_by(plan_id) %>% 
-  summarize(total_plan_area = sum(area_calc))
-
-plan_area %>% 
+  summarize(total_plan_area = sum(area_calc)) %>% 
   group_by() %>% 
   summarize(total_revew_area = sum(total_plan_area))
+
+
