@@ -20,7 +20,13 @@ library(gt)
 data.dir <- file.path("data", "processed")
 
 # Read Data -------------------------------------------------------------------
+# Processed document review
 review  <- readRDS(file.path(data.dir, "processed-doc-review.Rds"))
+
+# Refs sheet contains detail about the plan length of time/expiration
+refs <- readRDS(file.path("data", "raw-ish", "exported-doc-refs.Rds")) %>% 
+  janitor::clean_names() %>% 
+  filter(plan_id %in% review$plan_id)
 
 # Build Data -------------------------------------------------------------------
 review_stat <- review[review$type == "stat",]
@@ -28,6 +34,9 @@ review_stat <- review[review$type == "stat",]
 review_stat_wide <- review_stat %>% 
   pivot_wider(names_from = q_code, values_from = entry, id_cols = plan_id) %>% 
   mutate(across(.cols = c("climate_mention":"threat_habitat_cc"), .fns = as.numeric))
+
+plan_time <- refs %>% 
+  filter(document_type == "plan")
 
 # 3.1 Climate Change -----------------------------------------------------------
 
@@ -183,19 +192,55 @@ design_stat
 #   filter(!(entry == 0)) %>% 
 #   filter(q_code == "design_adaptive_climate")
 
-# Monitoring ---------------------------------------------------------------
+# 3.5 Monitoring ---------------------------------------------------------------
+
+monitor_stat <- review_stat_wide %>% 
+  # Monitoring in development (objectives but no actual monitoring)
+  mutate(monitor_planned = if_else(monitor_any == 1 & 
+                                     monitor_sci == 0 & 
+                                     monitor_soc == 0, 1, 0)) %>% 
+  # Only implicit monitoring 
+  mutate(monitor_cc_implicit = if_else(monitor_imp_any == 1 & monitor_exp_any == 0, 1, 0)) %>% 
+  # Combined implicit or explicit climate monitoring
+  mutate(monitor_cc_all = if_else(monitor_imp_any == 1 | monitor_exp_any == 1, 1, 0)) %>% 
+  # Combined planned or current climate change research
+  mutate(monitor_cc_research = if_else(obj_cc_research == 1 | monitor_exp_research == 1, 1, 0)) %>% 
+  select(monitor_any, monitor_planned, monitor_sci, monitor_soc,
+         monitor_cc_explicit = monitor_exp_any, 
+         monitor_cc_implicit,
+         monitor_cc_all, monitor_cc_research) %>% 
+  colSums(., na.rm = T) %>% as.list() %>% as.data.frame() %>% 
+  pivot_longer(everything(), names_to = "stat", values_to = "n_plans") %>%
+  # Calculate percentages
+  mutate(pct = round(n_plans/171*100, 1))
+
+monitor_stat
+
+# 3.6 Management ---------------------------------------------------------------
+
+plan_time %>% 
+  group_by() %>% 
+  summarize(avg_time = mean(time_listed, na.rm = TRUE),
+            sd_time = sd(time_listed, na.rm = TRUE),
+            num_nas = sum(is.na(time_listed)))
+
 
 review_stat %>% 
-  filter(category == "monitoring") %>% 
-  group_by(q_code, entry) %>% 
-  summarize(n = n()) %>% 
-  pivot_wider(names_from = entry, values_from = n) %>% 
-  mutate(pct_1 = `1`/(`1`+`0`))
-
-# Monitoring objectives but no actual monitoring
-review_stat_wide %>% 
-  filter(monitor_any == 1 & monitor_sci == 0 & monitor_soc == 0)
-
+  # Calculate number of years until update after added
+  # Insert Here
+  # Calculate number with multiple plans after added
+  # Insert here
+  # Across all threats - any strategy to address
+  mutate(threat_strat_all = if_else(if_any(c(threat_strat, threat_compliance_strat, 
+                                             threat_habitat_strat, threat_tourism_strat, 
+                                             threat_invasive_strat, threat_pollution_strat)), 1, 0)) %>% 
+  # Across all threats - any climate considerations
+  mutate(threat_cc_all = if_else(if_any(c(threat_cc, threat_compliance_cc, 
+                                          threat_habitat_cc, threat_tourism_cc, 
+                                          threat_invasive_cc, threat_pollution_cc)), 1, 0)) %>%   
+  select(mgmt_adapt, # num years, # num multiple plans,
+         threat_strat_all, threat_cc_all,
+         )
 
 review_stat %>% 
   filter(category == "management") %>% 

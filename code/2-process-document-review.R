@@ -20,7 +20,6 @@ out.dir <- here::here("data", "processed")
 review <- readRDS(file.path(data.dir, "exported-doc-review.Rds"))
 
 
-
 # Build Data ------------------------------------------------------------------
 
 # Assign new row names

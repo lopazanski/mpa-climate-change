@@ -67,3 +67,16 @@ review <- as.data.frame(review)
 ## Export document review
 saveRDS(review, file = file.path(data.dir, "exported-doc-review.Rds"))
 
+# Document References -----------------------------------------------------------
+
+## Read document review ----
+refs <- read_sheet("https://docs.google.com/spreadsheets/d/1FKkq5c44V-LvbJ9kCWibqc4SfXkDOUuRStZn_rHNcwk/edit#gid=135828176",
+                   sheet = "document-references", trim_ws = T, na = c("NA", "NS", ""), 
+                   #col_types = "c",
+                   .name_repair = "minimal")
+
+refs <- as.data.frame(refs) 
+
+## Export document review
+saveRDS(refs, file = file.path(data.dir, "exported-doc-refs.Rds"))
+

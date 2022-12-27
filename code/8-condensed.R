@@ -167,5 +167,5 @@ ggplot() +
   #labs(fill = "1 - awareness\n2 - action\n3 - climate action") +
   theme1
 
-ggsave("pacific_mpas.png", width = 6, height = 4, dpi = 300)
+#ggsave("pacific_mpas.png", width = 6, height = 4, dpi = 300)
 

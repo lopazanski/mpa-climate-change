@@ -98,9 +98,7 @@ data_final <- data_rev %>%
   filter(!(sovereign %in% c("USA") & no_take == "Not Reported" & rep_m_area == 0)) #Exclude US non-marine
 
 # Final list: 1398 observations 
-# I settled on this list for my search because it seemed reasonable (e.g. included areas seemed to fit the inclusion criteria
-# and there weren't any glaring missing pieces from a prior knowledge/geographic standpoint) and it was also a number that 
-# was reasonably close to the number of "fully-highly protected" areas on the MPA Atlas Database website (at the time ~1200ish)
+# I settled on this list for my search because it seemed reasonable (e.g. included areas seemed to fit the inclusion criteria and there weren't any glaring missing pieces from a prior knowledge/geographic standpoint) and it was also a number that was reasonably close to the number of "fully-highly protected" areas on the MPA Atlas Database website (at the time ~1200ish)
 
 # I had already started my management plan search before reaching this final list; now will add the info from the 
 # first part of the search to this completed list:

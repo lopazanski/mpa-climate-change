@@ -20,14 +20,21 @@ data.dir <- file.path("data", "raw-ish")
 out.dir <- file.path("data", "processed")
 
 # Read Data -------------------------------------------------------------------
-
-## MPA Atlas data
+## MPA Atlas full data
 atlas <- read_sf(dsn = atlas.dir,
                  layer = "mpatlas_20201223_clean")
 
-## Completed search information
+## MPA Atlas search list metadata (all entries except geometry)
+## Includes main three criteria and MPAs for 11 excluded plans
+## Created in 0-process-atlas-overlap.R
+atlas_list <- readRDS(file.path("data", "processed", "atlas_search_list.Rds"))
+
+## Completed search information (all entries that were searched during all 
+## project stages, therefore includes areas that are now excluded)
 search <- readRDS(file.path(data.dir, "exported-mpa-search-list.Rds")) %>% 
-  as.data.frame()
+  rename(name_search = name) %>% 
+  rename(network_from_mp = network)
+
 
 ## Plan metadata
 plan_data <- readRDS(file.path(data.dir, "exported-plan-metadata.Rds")) %>% 
@@ -37,25 +44,13 @@ plan_data <- readRDS(file.path(data.dir, "exported-plan-metadata.Rds")) %>%
 ## Processed document review
 review  <- readRDS(file.path("data", "processed", "processed-doc-review.Rds"))
 
-# Process Data -----------------------------------------------------------------
-search_clean <- search %>% 
-  rename(name_search = name) %>% 
-  rename(network_from_mp = network)
-
 
 # Build Data -------------------------------------------------------------------
-
 ## Filter atlas data for those in our search
-atlas_subset <- atlas %>% 
-  filter(mpa_id %in% search$mpa_id)
-    # Note: There are 3 mpa_id's in the search that are no longer considered 
-    # individual areas in MPA atlas with the updated version. This is because 
-    # the initial search list was generated from an older version of the atlas. 
-    # The 3 id's all correspond to GBR zones, which are represented by other 
-    # mpa_id's and therefore okay to exclude.
+atlas_sf
 
 ## Join atlas data with our search information
-atlas_search <- left_join(atlas_subset, search_clean)
+atlas_search <- left_join(atlas_list, search)
 
 ## Join atlas/search combo with plan metadata
 atlas_all <- left_join(atlas_search, plan_data, by = "plan_id")
@@ -71,4 +66,13 @@ data <- atlas_all %>%
                           "NI", search))
 
 # Export -----------------------------------------------------------------------
-saveRDS(data, file.path(out.dir, "processed-area-metadata.Rds"))
+saveRDS(data %>% sf::st_drop_geometry(), file.path(out.dir, "processed-area-metadata.Rds"))
+
+# # Get geometry for those in the search
+# atlas_all_geo <- atlas %>% 
+#   filter(mpa_id %in% data$mpa_id) %>% 
+#   select(mpa_id)
+# 
+# saveRDS(atlas_all_geo, file.path(out.dir, "processed-area-geometry.Rds"))
+
+

@@ -20,7 +20,7 @@ area_sf <- readRDS(file.path(data.dir, "processed-area-metadata.Rds"))
 review  <- readRDS(file.path(data.dir, "processed-doc-review.Rds"))
 
 # Build Data -------------------------------------------------------------------
-# Drop geometry
+# Drop geometry for simple pieces
 area <- area_sf %>% sf::st_drop_geometry()
 
 # New df for only the MPA areas that we found plans for
