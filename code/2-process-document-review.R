@@ -39,7 +39,7 @@ data <- review_t %>%
   # Drop old ID rows
   filter(Q_1 != "name") %>% 
   # Add identifier columns
-  mutate(plan_id = rep(1:175, each = 2)) %>% 
+  mutate(plan_id = rep(1:176, each = 2)) %>% 
   select(plan_id, Q_1:Q_83) 
 
 # Remove row names
