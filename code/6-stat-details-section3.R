@@ -26,7 +26,8 @@ review  <- readRDS(file.path(data.dir, "processed-doc-review.Rds"))
 # Refs sheet contains detail about the plan length of time/expiration
 refs <- readRDS(file.path("data", "raw-ish", "exported-doc-refs.Rds")) %>% 
   janitor::clean_names() %>% 
-  filter(plan_id %in% review$plan_id)
+  filter(plan_id %in% review$plan_id) %>% 
+  filter(document_type == "plan")
 
 # Build Data -------------------------------------------------------------------
 review_stat <- review[review$type == "stat",]
@@ -62,7 +63,7 @@ climate_stat <- review_stat %>%
   colSums() %>% as.list() %>% as.data.frame() %>% 
   pivot_longer(everything(),
                names_to = "stat", values_to = "n_plans") %>% 
-  mutate(pct = round(n_plans/171*100, 1))
+  mutate(pct = round(n_plans/172*100, 1))
 
 climate_stat
 
@@ -97,7 +98,7 @@ obj_stat <- review_stat_wide %>%
   colSums() %>% as.list() %>% as.data.frame() %>% 
   pivot_longer(everything(), names_to = "stat", values_to = "n_plans") %>%
   # Calculate percentages
-  mutate(pct = round(n_plans/171*100, 1))
+  mutate(pct = round(n_plans/172*100, 1))
   
 obj_stat
 
@@ -127,7 +128,7 @@ assess_stat <- review_stat_wide %>%
   filter(entry == 1) %>% 
   group_by(stat, entry) %>% 
   summarize(n_plans = n()) %>%
-  mutate(pct = round(n_plans/171*100, 1)) %>% 
+  mutate(pct = round(n_plans/172*100, 1)) %>% 
   select(stat, n_plans, pct) 
   
 assess_stat
@@ -137,7 +138,7 @@ review_stat_wide %>%
   filter(assess_any %in% c("1",  NA) | assess_climate %in% c("1", NA)) %>% 
   group_by() %>% 
   summarize(n_plans = n_distinct(plan_id),
-            pct_assess = round(n_plans/171*100,1),
+            pct_assess = round(n_plans/172*100,1),
             n_countries = n_distinct(country))
 
 
@@ -180,7 +181,7 @@ design_stat <- review_stat_wide %>%
   colSums() %>% as.list() %>% as.data.frame() %>% 
   pivot_longer(everything(), names_to = "stat", values_to = "n_plans") %>%
   # Calculate percentages
-  mutate(pct = round(n_plans/171*100, 1))
+  mutate(pct = round(n_plans/172*100, 1))
 
 design_stat
 
@@ -212,113 +213,70 @@ monitor_stat <- review_stat_wide %>%
   colSums(., na.rm = T) %>% as.list() %>% as.data.frame() %>% 
   pivot_longer(everything(), names_to = "stat", values_to = "n_plans") %>%
   # Calculate percentages
-  mutate(pct = round(n_plans/171*100, 1))
+  mutate(pct = round(n_plans/172*100, 1))
 
 monitor_stat
 
 # 3.6 Management ---------------------------------------------------------------
 
+## Plan Time ----
 plan_time %>% 
+  mutate(work_plan_binary = if_else(is.na(work_plan), 0, 1)) %>% 
   group_by() %>% 
-  summarize(avg_time = mean(time_listed, na.rm = TRUE),
+  summarize(min_time = min(time_listed, na.rm = T),
+            max_time = max(time_listed, na.rm = T),
+            avg_time = mean(time_listed, na.rm = TRUE),
             sd_time = sd(time_listed, na.rm = TRUE),
-            num_nas = sum(is.na(time_listed)))
+            num_nas = sum(is.na(time_listed)),
+            num_work_plan = sum(work_plan_binary, na.rm = T),
+            pct_work_plan = num_work_plan/172)
 
 
-review_stat %>% 
-  # Calculate number of years until update after added
-  # Insert Here
-  # Calculate number with multiple plans after added
-  # Insert here
+mgmt_stat <- review_stat_wide %>% 
+  # Across all threats - any identified
+  mutate(threat_any = if_else(if_any(c(threat_any, threat_compliance, 
+                                       threat_habitat, threat_tourism, 
+                                       threat_invasive, threat_pollution)), 1, 0)) %>% 
   # Across all threats - any strategy to address
-  mutate(threat_strat_all = if_else(if_any(c(threat_strat, threat_compliance_strat, 
+  mutate(threat_any_strat = if_else(if_any(c(threat_strat, threat_compliance_strat, 
                                              threat_habitat_strat, threat_tourism_strat, 
                                              threat_invasive_strat, threat_pollution_strat)), 1, 0)) %>% 
   # Across all threats - any climate considerations
-  mutate(threat_cc_all = if_else(if_any(c(threat_cc, threat_compliance_cc, 
+  mutate(threat_any_cc = if_else(if_any(c(threat_cc, threat_compliance_cc, 
                                           threat_habitat_cc, threat_tourism_cc, 
-                                          threat_invasive_cc, threat_pollution_cc)), 1, 0)) %>%   
-  select(mgmt_adapt, # num years, # num multiple plans,
-         threat_strat_all, threat_cc_all,
-         )
-
-review_stat %>% 
-  filter(category == "management") %>% 
-  group_by(q_code, entry) %>% 
-  summarize(n = n()) %>% 
-  pivot_wider(names_from = entry, values_from = n) %>% 
-  mutate(pct_1 = `1`/(`1`+`0`)) %>% 
-  print(., n = 22)
-
-# Climate Research
-review_stat_wide %>% 
-  filter(obj_cc_research == 1 | monitor_exp_research == 1) %>% 
-  group_by() %>% 
-  summarize(n = n(),
-            pct = n()/171*100)
-
-# Threats ---------------------------------------------------------------
-threats <- review_stat %>% 
-  filter(category == "management") %>% 
-  group_by(q_code, entry) %>% 
-  summarize(n = n()) %>% 
-  ungroup() %>% 
-  pivot_wider(names_from = entry, values_from = n) %>% 
-  mutate(pct_1 = `1`/(171)*100) %>% 
-  mutate(q_code = case_when(q_code == "threat_cc" ~ "threat_any_cc",
-                            q_code == "threat_strat" ~ "threat_any_strat",
-                            !(q_code %in% c("threat_cc", "threat_strat")) ~ q_code)) %>% 
-  separate(q_code,c("mgmt", "category", "type"), "_")  %>% 
-  filter(mgmt == "threat") %>% 
-  select(category, type, `1`, pct_1) %>% 
+                                          threat_invasive_cc, threat_pollution_cc)), 1, 0)) %>%
+  # Discuss protection as mitigation or carbon sink
+  mutate(mgmt_adapt_protection = if_else(climate_mitigation == 1 |
+                                           climate_sink == 1, 1, 0)) %>% 
+  select(mgmt_adapt, mgmt_adapt_protection, mgmt_adapt_green = obj_cc_green, 
+         mgmt_adapt_limitation = climate_limitations,
+         threat_any, threat_any_strat, threat_any_cc, 
+         threat_compliance, threat_compliance_strat, threat_compliance_cc,
+         threat_tourism, threat_tourism_strat, threat_tourism_cc,
+         threat_pollution, threat_pollution_strat, threat_pollution_cc,
+         threat_invasive, threat_invasive_strat, threat_invasive_cc,
+         threat_habitat, threat_habitat_strat, threat_habitat_cc) %>%
+  colSums(., na.rm = T) %>% as.list() %>% as.data.frame() %>%
+  pivot_longer(everything(), names_to = "stat", values_to = "n_plans") %>%
+  # Calculate percentages
+  mutate(pct = round(n_plans/172*100, 1)) %>% 
+  # Categorize climate inclusion
+  separate(stat, into = c("cat", "subcat", "type"), sep = "_", remove = F) %>% 
   mutate(type = factor(case_when(type == "cc" ~ "Climate Action",
                                  type == "strat" ~ "Recommended Action",
-                                 is.na(type) ~ "General Awareness"),
+                                 is.na(type) ~ "General Awareness",
+                                 type %in% c("protection", "green", "limitation") ~ "Climate Action"),
                        levels = c("Climate Action", "Recommended Action", "General Awareness"))) %>% 
-  mutate(category = recode_factor(category,
-                                  "habitat" = "Habitat Degradation",
-                                  "invasive" = "Invasive Species",
-                                  "pollution" = "Marine Debris or Pollution",
-                                  "tourism" = "Tourism",
-                                  "compliance" = "Lack of Compliance")) %>%
-  mutate(pct_label = round(pct_1, 1)) %>% 
-  filter(!(category == "any"))
+  mutate(subcat = recode_factor(subcat,
+                                "invasive" = "Invasive Species",
+                                "tourism" = "Tourism",
+                                "compliance" = "Lack of Compliance",
+                                "pollution" = "Marine Debris or Pollution",
+                                "habitat" = "Habitat Degradation"))
 
-ggplot(data = threats,
-       aes(y = category, x = pct_1)) +
-  geom_bar(stat = "identity", aes(fill = type), position = "dodge") +
-  geom_text(data = threats %>% filter(!(type == "Climate Action")),
-            aes(label = pct_label, color = type, hjust = 1.05), 
-            position = position_dodge2(0.6), vjust = -0.6,
-            show.legend = F, size = 3.5)+
-  geom_text(data = threats %>% filter(type == "Climate Action"),
-            aes(label = pct_label, color = type, hjust = -0.1), 
-            position = position_dodge2(0.6), 
-            vjust = 2.7, show.legend = F, size = 3.5)+
-  scale_y_discrete(expand = c(0,0))+ 
-  scale_fill_manual(values = c("#c9daf8","#6d9eeb", "#1155CC"),
-                    breaks = c("General Awareness", "Recommended Action", "Climate Action"))+
-  scale_color_manual(values = c("grey25", "grey25", "grey25"),
-                     breaks = c("General Awareness", "Recommended Action", "Climate Action")) +
-  scale_x_continuous(limits = c(0, 100), expand = c(0,0))+
-  labs(x = "Percent of Management Plans",
-       y = NULL,
-       fill = NULL) +
-  theme_bw() +
-  theme(panel.grid.minor.y = element_blank(),
-        panel.grid.major.y = element_blank(),
-        panel.spacing = unit(0, "mm"),
-        strip.background = element_rect(fill = "transparent", color = "transparent"),
-        axis.text.y = element_text(size = 10),
-        axis.text.x = element_text(size = 9),
-        axis.title.x = element_text(size = 10),
-        legend.text = element_text(size = 10),
-        legend.key.size = unit(0.5, "cm"),
-        legend.box.margin = margin(0,-10,-10,-10),
-        strip.text = element_text(hjust = 0, face = "bold", size = 9),
-        plot.margin = margin(2, 10, 2, 2),
-        #legend.box.background = element_rect(color = "grey55"),
-        #legend.margin = margin(2,4,0,2),
-        legend.position = "top")
+# Stats in the text  
+mgmt_stat %>% 
+  filter(subcat %in% c("any", "adapt")) %>% 
+  select(stat, n_plans, pct)
 
 

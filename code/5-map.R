@@ -19,7 +19,9 @@ library(ggExtra)
 data.dir <- file.path("data", "processed")
 
 # Read Data -------------------------------------------------------------------
-area_sf <- readRDS(file.path(data.dir, "processed-area-metadata.Rds"))
+area_sf <- readRDS(file.path(data.dir, "processed-area-geometry.Rds"))
+area    <- readRDS(file.path(data.dir, "processed-area-metadata.Rds")) %>% 
+  select(mpa_id, plan_id)
 review  <- readRDS(file.path(data.dir, "processed-doc-review.Rds"))
 
 
@@ -49,6 +51,7 @@ mpa_pts <- mpa_centroids %>%
 # Bind to a single data frame
 mpa_df <- mpa_centroids %>% 
   cbind(mpa_pts) %>% 
+  left_join(., area, by = "mpa_id") %>% 
   left_join(., climate_mention, by = "plan_id")
 
 # Create axes labels
@@ -119,6 +122,10 @@ world_data <- map_data("world")
 
 # Replace NAs with "plan not located"
 mpa_df$climate_mention[is.na(mpa_df$climate_mention)] <- "Plan not located"
+
+mpa_df <- mpa_df %>% 
+  mutate(climate_mention = factor(climate_mention,
+                                levels = c("No", "Yes", "No plan located")))
 
 # Build map 
 g1 <- ggplot() +

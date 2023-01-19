@@ -16,13 +16,11 @@ library(gt)
 data.dir <- file.path("data", "processed")
 
 # Read Data -------------------------------------------------------------------
-area_sf <- readRDS(file.path(data.dir, "processed-area-metadata.Rds"))
+area <- readRDS(file.path(data.dir, "processed-area-metadata.Rds"))
+area_sf <- readRDS(file.path(data.dir, "processed-area-geometry.Rds"))
 review  <- readRDS(file.path(data.dir, "processed-doc-review.Rds"))
 
 # Build Data -------------------------------------------------------------------
-# Drop geometry for simple pieces
-area <- area_sf %>% sf::st_drop_geometry()
-
 # New df for only the MPA areas that we found plans for
 area_found <- area[area$search == "F",]
 
@@ -32,7 +30,6 @@ review_stat <- review[review$type == "stat",]
 # Widen stats (every MP is a row)
 review_stat_wide <- review_stat %>% 
   pivot_wider(names_from = q_code, values_from = entry, id_cols = plan_id)
-
 
 # Stats for Manuscript ---------------------------------------------------------
 
@@ -102,8 +99,7 @@ review_stat %>%
 
 ### Add size class ----
 area_calc <- area_sf %>%
-  filter(mpa_id %in% area_found$mpa_id) %>%
-  st_make_valid() %>%
+  sf::st_make_valid() %>%
   st_area() %>%
   as.numeric() %>%
   measurements::conv_unit(., "m2", "km2")
