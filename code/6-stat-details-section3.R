@@ -63,7 +63,11 @@ climate_stat <- review_stat %>%
   colSums() %>% as.list() %>% as.data.frame() %>% 
   pivot_longer(everything(),
                names_to = "stat", values_to = "n_plans") %>% 
-  mutate(pct = round(n_plans/172*100, 1))
+  mutate(pct = round(n_plans/172*100, 1)) %>% 
+  mutate(type = factor("Climate Action",
+                       levels = c("Climate Action", "Recommended Action", "General Awareness"))) %>% 
+  mutate(figure = if_else(stat == "climate_mention_only", 0, 1)) %>% 
+  mutate(category = "Climate change")
 
 climate_stat
 
@@ -71,7 +75,7 @@ climate_stat
 # Conservation objectives
 obj_stat <- review_stat_wide %>% 
   # Plans with both species and unit conservation objectives
-  mutate(obj_both = if_else(obj_sp == 1 & obj_unit == 1, 1, 0)) %>% 
+  mutate(obj_cons_both = if_else(obj_sp == 1 & obj_unit == 1, 1, 0)) %>% 
   # Any management objective 
   mutate(obj_mgmt_any = if_else(if_any(c(obj_any, obj_cc_any, obj_lt_any, monitor_any), 
                                        ~. == 1), 1, 0)) %>% 
@@ -90,15 +94,24 @@ obj_stat <- review_stat_wide %>%
                                 obj_cc_general == 1 | 
                                 obj_cc_resilience == 1, 1, 0)) %>% 
   # Select columns for output
-  select(obj_any, obj_sp, obj_unit, obj_both, 
-         obj_mgmt_any, obj_mgmt_lt, 
+  select(obj_cons_any = obj_any, obj_cons_sp = obj_sp, obj_cons_unit = obj_unit, 
+         obj_cons_both, obj_mgmt_any, obj_mgmt_lt, 
          obj_mgmt_eco, obj_mgmt_monitor, obj_mgmt_res, obj_mgmt_ref,
          obj_cc_any, obj_cc_gen) %>% 
   # Summarize and create dataframe
   colSums() %>% as.list() %>% as.data.frame() %>% 
   pivot_longer(everything(), names_to = "stat", values_to = "n_plans") %>%
   # Calculate percentages
-  mutate(pct = round(n_plans/172*100, 1))
+  mutate(pct = round(n_plans/172*100, 1)) %>% 
+  mutate(type = factor(case_when(stat %in% c("obj_cons_any", "obj_mgmt_any") ~ "General Awareness",
+                                 stat %in% c("obj_cons_sp", "obj_cons_unit", "obj_cons_both",
+                                             "obj_mgmt_lt", "obj_mgmt_eco", "obj_mgmt_monitor",
+                                             "obj_mgmt_res", "obj_mgmt_ref") ~ "Recommended Action",
+                                 stat %in% c("obj_cc_any", "obj_cc_gen") ~ "Climate Action"),
+                       levels = c("Climate Action", "Recommended Action", "General Awareness"))) %>% 
+  mutate(figure = if_else(stat %in% c("obj_mgmt_any", "obj_cons_any", "obj_mgmt_lt", 
+                                      "obj_cons_both", "obj_cc_any"), 1, 0)) %>% 
+  mutate(category = "Objectives")
   
 obj_stat
 
@@ -129,7 +142,16 @@ assess_stat <- review_stat_wide %>%
   group_by(stat, entry) %>% 
   summarize(n_plans = n()) %>%
   mutate(pct = round(n_plans/172*100, 1)) %>% 
-  select(stat, n_plans, pct) 
+  select(stat, n_plans, pct) %>% 
+  mutate(type = factor(case_when(stat %in% c("assess_threat") ~ "General Awareness",
+                                 stat %in% c("assess_all", "assess_any", "assess_any_both",
+                                             "assess_any_planned") ~ "Recommended Action",
+                                 stat %in% c("assess_climate", "assess_cc_both",
+                                             "assess_cc_planned") ~ "Climate Action"),
+                       levels = c("Climate Action", "Recommended Action", "General Awareness"))) %>% 
+  mutate(figure = if_else(stat %in% c("assess_threat", "assess_any_both", 
+                                      "assess_cc_both"), 1, 0)) %>% 
+  mutate(category = "Assessments")
   
 assess_stat
 
@@ -177,11 +199,20 @@ design_stat <- review_stat_wide %>%
          design_cc_resilient_all, design_cc_critical_all, design_cc_connect_all,
          design_cc_shifting_all, design_cc_refugia_all,
          design_adaptive_any, design_adaptive_fully, design_adaptive_zoning, design_adaptive_both,
-         design_adaptive_climate) %>% 
+         design_cc_adaptive = design_adaptive_climate) %>% 
   colSums() %>% as.list() %>% as.data.frame() %>% 
   pivot_longer(everything(), names_to = "stat", values_to = "n_plans") %>%
   # Calculate percentages
-  mutate(pct = round(n_plans/172*100, 1))
+  mutate(pct = round(n_plans/172*100, 1)) %>% 
+  separate(stat, into = c("cat", "type", "subcat"), sep = "_", remove = F) %>% 
+  mutate(type = factor(case_when(type %in% c("any", "type") ~ "General Awareness",
+                                 type %in% c("resilience", "adaptive") ~ "Recommended Action",
+                                 type == "cc" ~ "Climate Action"),
+                       levels = c("Climate Action", "Recommended Action", "General Awareness"))) %>% 
+  mutate(figure = if_else(stat %in% c("design_any", "design_resilience_all", "design_adaptive_any",
+                                      "design_cc_all", "design_cc_adaptive"), 1, 0)) %>% 
+  select(stat, n_plans, pct, type, figure) %>% 
+  mutate(category = "Design")
 
 design_stat
 
@@ -213,7 +244,14 @@ monitor_stat <- review_stat_wide %>%
   colSums(., na.rm = T) %>% as.list() %>% as.data.frame() %>% 
   pivot_longer(everything(), names_to = "stat", values_to = "n_plans") %>%
   # Calculate percentages
-  mutate(pct = round(n_plans/172*100, 1))
+  mutate(pct = round(n_plans/172*100, 1)) %>% 
+  mutate(type = factor(case_when(stat %in% c("monitor_any", "monitor_planned") ~ "General Awareness",
+                                 stat %in% c("monitor_sci", "monitor_soc") ~ "Recommended Action",
+                                 TRUE ~ "Climate Action"),
+                       levels = c("Climate Action", "Recommended Action", "General Awareness"))) %>% 
+  mutate(figure = if_else(stat %in% c("monitor_any", "monitor_sci", "monitor_soc",
+                                      "monitor_cc_explicit"), 1, 0)) %>% 
+  mutate(category = "Monitoring")
 
 monitor_stat
 
@@ -248,7 +286,12 @@ mgmt_stat <- review_stat_wide %>%
   # Discuss protection as mitigation or carbon sink
   mutate(mgmt_adapt_protection = if_else(climate_mitigation == 1 |
                                            climate_sink == 1, 1, 0)) %>% 
-  select(mgmt_adapt, mgmt_adapt_protection, mgmt_adapt_green = obj_cc_green, 
+  # Any climate mitigation 
+  mutate(mgmt_adapt_anymitigation = if_else(if_any(c(mgmt_adapt_protection, 
+                                                  obj_cc_green, obj_cc_awareness)), 1, 0)) %>% 
+  select(mgmt_adapt, mgmt_adapt_anymitigation, mgmt_adapt_protection, 
+         mgmt_adapt_green = obj_cc_green, 
+         mgmt_adapt_awareness = obj_cc_awareness, 
          mgmt_adapt_limitation = climate_limitations,
          threat_any, threat_any_strat, threat_any_cc, 
          threat_compliance, threat_compliance_strat, threat_compliance_cc,
@@ -265,18 +308,46 @@ mgmt_stat <- review_stat_wide %>%
   mutate(type = factor(case_when(type == "cc" ~ "Climate Action",
                                  type == "strat" ~ "Recommended Action",
                                  is.na(type) ~ "General Awareness",
-                                 type %in% c("protection", "green", "limitation") ~ "Climate Action"),
+                                 type %in% c("protection", "green", "limitation", 
+                                             "awareness", "anymitigation") ~ "Climate Action"),
                        levels = c("Climate Action", "Recommended Action", "General Awareness"))) %>% 
   mutate(subcat = recode_factor(subcat,
                                 "invasive" = "Invasive Species",
                                 "tourism" = "Tourism",
                                 "compliance" = "Lack of Compliance",
                                 "pollution" = "Marine Debris or Pollution",
-                                "habitat" = "Habitat Degradation"))
+                                "habitat" = "Habitat Degradation")) %>% 
+  mutate(figure = if_else(stat %in% c("mgmt_adapt", "mgmt_adapt_anymitigation") | subcat == "any", 1, 0)) %>% 
+  mutate(figure = if_else(stat == "threat_any", 0, figure)) %>% 
+  select(stat, n_plans, pct, type, figure) %>% 
+  mutate(category = "Adaptive management")
 
 # Stats in the text  
 mgmt_stat %>% 
-  filter(subcat %in% c("any", "adapt")) %>% 
-  select(stat, n_plans, pct)
+  filter(str_detect(stat, "mgmt"))
+
+mgmt_stat
+
+# Merge Stats -------------------------------------------------------------------
+
+data <- rbind(climate_stat, obj_stat, assess_stat, 
+              design_stat, monitor_stat, mgmt_stat) %>% 
+  # Convert section categories to factor and assign levels
+  mutate(category = factor(category,
+                           levels = c("Climate change",
+                                      "Objectives", "Assessments",
+                                      "Design", "Monitoring", "Adaptive management"))) 
+all_stat <- data
+
+# Export -----------------------------------------------------------------------
+
+saveRDS(all_stat, file.path("data", "processed", "all_stat.Rds"))
+
+
+
+
+
+
+
 
 
