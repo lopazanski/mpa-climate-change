@@ -80,3 +80,11 @@ refs <- as.data.frame(refs)
 ## Export document review
 saveRDS(refs, file = file.path(data.dir, "exported-doc-refs.Rds"))
 
+# Plan Names ----------------------------------------------------------------------
+names <- read_sheet("https://docs.google.com/spreadsheets/d/1lqxaoukY0-k0a5mu5-Zjx-dtHjnPIgYzYkIsnGCudFQ/edit#gid=452132598",
+                    sheet = "plan-names", trim_ws = T, na = c("NA", "NS", ""), 
+                   .name_repair = "minimal")
+
+names <- as.data.frame(names)
+
+saveRDS(names, file.path(data.dir, "exported-plan-names.Rds"))

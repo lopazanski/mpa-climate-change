@@ -9,10 +9,146 @@ rm(list = ls())
 
 # Packages
 library(tidyverse)
-
+library(cowplot)
 
 # Directories
 data.dir <- file.path("data", "processed")
+
+
+# Read Data -------------------------------------------------------------------
+all_plan      <- readRDS(file.path(data.dir, "all_stat_by_plan.Rds"))
+plan_names <- readRDS(file.path("data", "raw-ish", "exported-plan-names.Rds"))
+plan_region   <- readRDS(file.path(data.dir, "processed-area-metadata.Rds")) %>% 
+  select(plan_id, region) %>% distinct() %>% 
+  filter(plan_id %in% all_plan$plan_id)
+
+
+# Build Data -------------------------------------------------------------------
+# Format names
+names <- plan_names %>% 
+  select(plan_id, name_english) %>% 
+  mutate(name_abbrev = str_replace(name_english, "Marine Protected Area", "MPA")) %>% 
+  mutate(name_abbrev = str_replace(name_abbrev, "Marine Reserve", "MR")) %>% 
+  mutate(name_abbrev = str_replace(name_abbrev, "National Park", "NP")) %>% 
+  mutate(name_abbrev = str_replace(name_abbrev, "Marine Park", "MP")) %>% 
+  mutate(name_abbrev = str_replace(name_abbrev, "Biosphere Reserve", "BR")) %>% 
+  mutate(name_abbrev = str_replace(name_abbrev, "National Marine Sanctuary", "NMS"))
+  
+# Test region ratio
+region_count <- plan_region %>% 
+  group_by(region) %>% 
+  count()
+# 94 in left plot, 78 in right plot
+
+# Classify level for each plan 
+data <- all_plan %>% 
+  group_by(plan_id, category, type) %>% 
+  # Sum the total number of 1's for each indicator
+  summarize(score = sum(entry, na.rm = T)) %>% 
+  ungroup() %>% 
+  pivot_wider(names_from = type, values_from = score) %>% 
+  janitor::clean_names() %>% 
+  # Factor for the level of inclusion based on nonzero score
+  mutate(level = factor(case_when(climate_action > 0 ~ "Climate Action",
+                                  recommended_action > 0 ~ "Recommended Action",
+                                  general_awareness > 0 ~ "General Awareness"),
+                        levels = c("General Awareness", "Recommended Action", "Climate Action", "Not Included")))
+
+data_wide <- data %>% 
+  select(plan_id, category, level) %>% 
+  pivot_wider(names_from = category, values_from = level)
+
+
+
+scores <- data %>% 
+  group_by(plan_id) %>%
+  # Total score for each level of inclusion
+  summarize(total_climate = sum(climate_action, na.rm = T),
+            total_rec = sum(recommended_action, na.rm = T),
+            total_aware = sum(general_awareness, na.rm = T))
+
+level_counts <- data %>% 
+  group_by(plan_id) %>% 
+  count(level) %>% 
+  mutate(level_name = case_when(level == "Climate Action" ~ "climate_count",
+                                level == "Recommended Action" ~ "rec_count",
+                                level == "General Awareness" ~ "aware_count",
+                                is.na(level) ~ "not_included")) %>% 
+  rename(level_counts = n) %>% 
+  select(plan_id, level_name, level_counts) %>% 
+  pivot_wider(names_from = level_name, values_from = level_counts)
+  
+level_counts[is.na(level_counts)] <- 0
+
+data3 <- data %>% 
+  left_join(., names) %>% 
+  left_join(., plan_region) %>% 
+  left_join(., scores) %>% 
+  left_join(., level_counts) %>% 
+  mutate(name_ordered = factor(name_abbrev, 
+                               levels = unique(name_abbrev[order(climate_count, rec_count, aware_count, total_climate, total_rec)]), 
+                               ordered = T))
+  
+  #mutate(name_ordered = reorder(name_abbrev, level_counts))
+
+data3$level[is.na(data3$level)] <- "Not Included"
+
+# Plot -------------------------------------------------------------------
+theme1 <- theme(axis.text.y = element_text(size = 6),
+                axis.text.x = element_text(size = 7, angle = 45, vjust = 1, hjust=1),
+                axis.title  = element_blank(),
+                axis.line.x = element_line(size = 0.5),
+                # Legend
+                legend.title = element_blank(),
+                legend.text = element_text(size = 9),
+                legend.key.size = unit(0.4, "cm"),
+                legend.spacing.x = unit(0.1, "cm"),
+                legend.background = element_rect(color = "black", size = 0.25),
+                strip.text = element_text(face = "bold", size = 8),
+                plot.title  = element_blank(),
+                # Gridlines
+                panel.grid.major = element_blank(), 
+                panel.grid.minor = element_blank(),
+                panel.background = element_blank(), 
+                axis.line = element_line(colour = "black"))
+# Legend
+#legend.background = element_rect(fill=alpha('blue', 0)))
+g1 <- ggplot(data = data3 %>% 
+               filter(region %in% c("Atlantic", "Indian", "Mediterranean"))) +
+  geom_tile(aes(x = category, y = name_ordered, fill = level),
+            show.legend = F) +
+  scale_fill_manual(values = c("#c9daf8", "#6d9eeb", "#1155CC", "white"),
+                    na.translate = F) +
+  ggh4x::facet_nested(region~., scales = "free", space = "free") +
+  scale_x_discrete(expand = c(0,0)) +
+  scale_y_discrete(expand = c(0,0)) +
+  theme1 +
+  theme(plot.margin = margin(5, 5, 5, 5))
+
+g1
+
+g2 <- ggplot(data = data3 %>% 
+               filter(!(region %in% c("Atlantic", "Indian", "Mediterranean")))) +
+  geom_tile(aes(x = category, y = name_ordered, fill = level)) +
+  scale_fill_manual(values = c("#c9daf8", "#6d9eeb", "#1155CC", "white"),
+                    na.translate = T,) +
+  ggh4x::facet_nested(region~., scales = "free", space = "free") +
+  scale_x_discrete(expand = c(0,0)) +
+  scale_y_discrete(expand = c(0,0))  +
+  theme1 +
+  theme(legend.position = "top",
+        legend.direction = "vertical",
+        legend.margin = margin(0, 5, 5, 5),
+        legend.key = element_rect(colour = "grey20"),
+        legend.box.margin = margin(5, 130, -5,-10),
+        plot.margin = margin(5, 5, 5, 5))
+
+
+g2
+
+plot_grid(g1, g2, ncol = 2, align = "h", axis = "b")
+ggsave(file.path("figs", "Fig5_Stat_by_MPA.png"), width = 6.5, height = 8, dpi = 600)
+
 
 # Read Data -------------------------------------------------------------------
 review  <- readRDS(file.path(data.dir, "processed-doc-review.Rds"))

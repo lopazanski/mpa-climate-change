@@ -152,4 +152,38 @@ atlas_valid <- atlas %>%
 
 saveRDS(atlas_valid, file.path(out.dir, "processed-area-geometry.Rds"))
 
+# Misc -----
+# Review those that are fully-highly
+atlas_fh <- atlas_simple %>% #20933
+  filter(implemente == 1)%>%  # Implemented (step matches old version) 17793 
+  filter(no_take %in% c("All")) %>%  #  No-take ALL
+  filter(is_mpa == 1) # Is MPA #1037
+
+
+# Which MPA-IDs are "extra" from my list (not in atlas search above)
+extra_mpas <- search %>% 
+  filter(!(mpa_id %in% atlas_fh$mpa_id)) #676
+
+# Which plans are "extra" from my list based on those missing MPA-IDs?
+included_plans <- search %>% 
+  # Only keep mpa-id's from those in our search
+  filter(mpa_id %in% atlas_fh$mpa_id) %>% 
+  # Select plan id's
+  select(plan_id) %>% 
+  # Unique remaining plan IDs
+  unique()
+
+all <- data.frame(plan_id = c(1:176))
+
+excluded_plans <- all %>% 
+  filter(!(plan_id %in% included_plans$plan_id)) # 11 
+
+## 3. Inspect excluded plans ----
+# Extract MPA-IDs for the 11 excluded plans
+excluded_mpas <- search %>% 
+  filter(plan_id %in% excluded_plans$plan_id)
+
+# Extract full metadata for the 11 excluded plans
+atlas_excluded <- atlas_simple %>% 
+  filter(mpa_id %in% excluded_mpas$mpa_id)
 

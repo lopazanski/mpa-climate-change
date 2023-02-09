@@ -69,14 +69,14 @@ mgmt_plot <- ggplot(data = mgmt_stat %>%
             aes(label = pct, color = type, hjust = -0.1), 
             position = position_dodge2(0.9), 
             #vjust = 2.7, 
-            show.legend = F, size = 3) +
+            show.legend = F, size = 2) +
   scale_y_discrete(expand = c(0,0))+ 
   scale_fill_manual(values = c("#c9daf8","#6d9eeb", "#1155CC"),
                     breaks = c("General Awareness", "Recommended Action", "Climate Action"))+
   scale_color_manual(values = c("grey25", "grey25", "grey25"),
                      breaks = c("General Awareness", "Recommended Action", "Climate Action")) +
   scale_x_continuous(limits = c(0, 100), expand = c(0,0))+
-  labs(x = "Percent of Management Plans",
+  labs(x = "Percent of management plans",
        y = NULL,
        fill = NULL) +
   theme_bw() +
@@ -84,16 +84,19 @@ mgmt_plot <- ggplot(data = mgmt_stat %>%
         panel.grid.major.y = element_blank(),
         panel.spacing = unit(0, "mm"),
         strip.background = element_rect(fill = "transparent", color = "transparent"),
-        axis.text.y = element_text(size = 10),
-        axis.text.x = element_text(size = 9),
-        axis.title.x = element_text(size = 10),
-        legend.text = element_text(size = 8),
-        legend.key.size = unit(0.5, "cm"),
+        axis.text.y = element_text(size = 7),
+        axis.text.x = element_text(size = 6),
+        axis.title.x = element_text(size = 7),
+        legend.text = element_text(size = 6),
+        legend.key.size = unit(0.25, "cm"),
+        legend.spacing.x = unit(0.1, "cm"),
+        legend.direction = "vertical",
         legend.box.margin = margin(0,-10,-10,-10),
         strip.text = element_text(hjust = 0, face = "bold", size = 9),
-        plot.margin = margin(2, 10, 2, 2),
+        plot.margin = margin(-5, 8, 2, 2),
         #legend.box.background = element_rect(color = "grey55"),
         #legend.margin = margin(2,4,0,2),
         legend.position = "top")
 mgmt_plot
-ggsave(file.path("figs", "Fig4_Threats.png"), width = 5.5, height = 4.5, units = c("in"), dpi = 300)
+ggsave(file.path("figs", "Fig4_Threats.png"), width = 3.25, height = 3.25, units = c("in"), dpi = 300)
+

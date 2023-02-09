@@ -41,7 +41,7 @@ plan_time <- refs %>%
 
 # 3.1 Climate Change -----------------------------------------------------------
 
-climate_stat <- review_stat %>% 
+climate_wide <- review_stat %>% 
   # Filter for main categories with explicit climate change questions
   filter(category == "climate" | 
            q_code == "obj_cc_any" | 
@@ -58,7 +58,10 @@ climate_stat <- review_stat %>%
   # Create "in between" column (total climate != 0, but climate_plan = 0)
   mutate(climate_some = if_else(total_climate > 1 & climate_plan == 0, 1, 0)) %>% 
   # Select relevant columns
-  select(climate_mention, climate_mention_only, climate_plan, climate_some) %>% 
+  select(plan_id, climate_mention, climate_mention_only, climate_plan, climate_some) 
+
+climate_stat <- climate_wide %>% 
+  select(-plan_id) %>% 
   # Summarize each column
   colSums() %>% as.list() %>% as.data.frame() %>% 
   pivot_longer(everything(),
@@ -73,7 +76,7 @@ climate_stat
 
 # 3.2 Conservation Objectives --------------------------------------------------
 # Conservation objectives
-obj_stat <- review_stat_wide %>% 
+obj_wide <- review_stat_wide %>% 
   # Plans with both species and unit conservation objectives
   mutate(obj_cons_both = if_else(obj_sp == 1 & obj_unit == 1, 1, 0)) %>% 
   # Any management objective 
@@ -94,10 +97,13 @@ obj_stat <- review_stat_wide %>%
                                 obj_cc_general == 1 | 
                                 obj_cc_resilience == 1, 1, 0)) %>% 
   # Select columns for output
-  select(obj_cons_any = obj_any, obj_cons_sp = obj_sp, obj_cons_unit = obj_unit, 
+  select(plan_id, obj_cons_any = obj_any, obj_cons_sp = obj_sp, obj_cons_unit = obj_unit, 
          obj_cons_both, obj_mgmt_any, obj_mgmt_lt, 
          obj_mgmt_eco, obj_mgmt_monitor, obj_mgmt_res, obj_mgmt_ref,
-         obj_cc_any, obj_cc_gen) %>% 
+         obj_cc_any, obj_cc_gen) 
+
+obj_stat <- obj_wide %>% 
+  select(-plan_id) %>% 
   # Summarize and create dataframe
   colSums() %>% as.list() %>% as.data.frame() %>% 
   pivot_longer(everything(), names_to = "stat", values_to = "n_plans") %>%
@@ -118,7 +124,7 @@ obj_stat
 # 3.3 Assessments --------------------------------------------------------------
 
 # General totals
-assess_stat <- review_stat_wide %>% 
+assess_wide <- review_stat_wide %>% 
   # Create "any threat identified" column
   mutate(assess_threat = if_else(if_any(c(threat_any, threat_compliance, 
                                           threat_habitat, threat_tourism, 
@@ -134,9 +140,12 @@ assess_stat <- review_stat_wide %>%
   # All past and future assessments (both climate and non-climate) 
   mutate(assess_all = if_else(assess_any %in% c("1",  NA) | 
                                 assess_climate %in% c("1", NA), 1, 0)) %>%
-  select(assess_threat, assess_any, assess_any_planned, assess_any_both,
+  select(plan_id, assess_threat, assess_any, assess_any_planned, assess_any_both,
          assess_climate, assess_cc_planned, assess_cc_both,
-         assess_all) %>% 
+         assess_all) 
+
+assess_stat <- assess_wide %>% 
+  select(-plan_id) %>% 
   pivot_longer(everything(), names_to = "stat", values_to = "entry") %>% 
   filter(entry == 1) %>% 
   group_by(stat, entry) %>% 
@@ -173,7 +182,7 @@ review_stat %>%
   pivot_wider(names_from = entry, values_from = n) %>% 
   mutate(pct_1 = `1`/(`1`+`0`)*100) 
 
-design_stat <- review_stat_wide %>% 
+design_wide <- review_stat_wide %>% 
   # Design type - only zoning
   mutate(design_type_zoning = if_else(design_type == 0.5, 1, 0)) %>% 
   # Design type - boundaries
@@ -194,12 +203,15 @@ design_stat <- review_stat_wide %>%
          design_cc_refugia_all = if_else(design_cc_refugia %in% c(0.5, 1), 1, 0)) %>% 
   # Both adaptive zoning and adaptive boundaires
   mutate(design_adaptive_both = if_else(design_adaptive_fully == 1 & design_adaptive_zoning == 1, 1, 0)) %>% 
-  select(design_any, design_type_zoning, design_type_boundaries,design_resilience_all, 
+  select(plan_id, design_any, design_type_zoning, design_type_boundaries,design_resilience_all, 
          design_cc_all, design_cc_planned, design_cc_current,
          design_cc_resilient_all, design_cc_critical_all, design_cc_connect_all,
          design_cc_shifting_all, design_cc_refugia_all,
          design_adaptive_any, design_adaptive_fully, design_adaptive_zoning, design_adaptive_both,
-         design_cc_adaptive = design_adaptive_climate) %>% 
+         design_cc_adaptive = design_adaptive_climate) 
+
+design_stat <- design_wide %>% 
+  select(-plan_id) %>% 
   colSums() %>% as.list() %>% as.data.frame() %>% 
   pivot_longer(everything(), names_to = "stat", values_to = "n_plans") %>%
   # Calculate percentages
@@ -226,7 +238,7 @@ design_stat
 
 # 3.5 Monitoring ---------------------------------------------------------------
 
-monitor_stat <- review_stat_wide %>% 
+monitor_wide <- review_stat_wide %>% 
   # Monitoring in development (objectives but no actual monitoring)
   mutate(monitor_planned = if_else(monitor_any == 1 & 
                                      monitor_sci == 0 & 
@@ -237,10 +249,13 @@ monitor_stat <- review_stat_wide %>%
   mutate(monitor_cc_all = if_else(monitor_imp_any == 1 | monitor_exp_any == 1, 1, 0)) %>% 
   # Combined planned or current climate change research
   mutate(monitor_cc_research = if_else(obj_cc_research == 1 | monitor_exp_research == 1, 1, 0)) %>% 
-  select(monitor_any, monitor_planned, monitor_sci, monitor_soc,
+  select(plan_id, monitor_any, monitor_planned, monitor_sci, monitor_soc,
          monitor_cc_explicit = monitor_exp_any, 
          monitor_cc_implicit,
-         monitor_cc_all, monitor_cc_research) %>% 
+         monitor_cc_all, monitor_cc_research) 
+
+monitor_stat <- monitor_wide %>% 
+  select(-plan_id) %>% 
   colSums(., na.rm = T) %>% as.list() %>% as.data.frame() %>% 
   pivot_longer(everything(), names_to = "stat", values_to = "n_plans") %>%
   # Calculate percentages
@@ -270,7 +285,7 @@ plan_time %>%
             pct_work_plan = num_work_plan/172)
 
 
-mgmt_stat <- review_stat_wide %>% 
+mgmt_wide <- review_stat_wide %>% 
   # Across all threats - any identified
   mutate(threat_any = if_else(if_any(c(threat_any, threat_compliance, 
                                        threat_habitat, threat_tourism, 
@@ -289,7 +304,7 @@ mgmt_stat <- review_stat_wide %>%
   # Any climate mitigation 
   mutate(mgmt_adapt_anymitigation = if_else(if_any(c(mgmt_adapt_protection, 
                                                   obj_cc_green, obj_cc_awareness)), 1, 0)) %>% 
-  select(mgmt_adapt, mgmt_adapt_anymitigation, mgmt_adapt_protection, 
+  select(plan_id, mgmt_adapt, mgmt_adapt_anymitigation, mgmt_adapt_protection, 
          mgmt_adapt_green = obj_cc_green, 
          mgmt_adapt_awareness = obj_cc_awareness, 
          mgmt_adapt_limitation = climate_limitations,
@@ -298,7 +313,10 @@ mgmt_stat <- review_stat_wide %>%
          threat_tourism, threat_tourism_strat, threat_tourism_cc,
          threat_pollution, threat_pollution_strat, threat_pollution_cc,
          threat_invasive, threat_invasive_strat, threat_invasive_cc,
-         threat_habitat, threat_habitat_strat, threat_habitat_cc) %>%
+         threat_habitat, threat_habitat_strat, threat_habitat_cc) 
+
+mgmt_stat <- mgmt_wide %>%
+  select(-plan_id) %>% 
   colSums(., na.rm = T) %>% as.list() %>% as.data.frame() %>%
   pivot_longer(everything(), names_to = "stat", values_to = "n_plans") %>%
   # Calculate percentages
@@ -328,6 +346,8 @@ mgmt_stat %>%
 
 mgmt_stat
 
+
+
 # Merge Stats -------------------------------------------------------------------
 
 data <- rbind(climate_stat, obj_stat, assess_stat, 
@@ -339,12 +359,26 @@ data <- rbind(climate_stat, obj_stat, assess_stat,
                                       "Design", "Monitoring", "Adaptive management"))) 
 all_stat <- data
 
+
+
+
+# Merge Wide -------------------------------------------------------------------
+# Data frame has ones and zeroes for every stat included in the manuscript
+all_wide <- full_join(climate_wide, obj_wide) %>% 
+  full_join(., assess_wide) %>% 
+  full_join(., design_wide) %>% 
+  full_join(., monitor_wide) %>% 
+  full_join(., mgmt_wide)
+
+# Lengthen
+all_by_plan <- all_wide %>% 
+  pivot_longer(cols = 2:74, names_to = "stat", values_to = "entry") %>% 
+  left_join(all_stat, by = "stat")
+
 # Export -----------------------------------------------------------------------
-
 saveRDS(all_stat, file.path("data", "processed", "all_stat.Rds"))
-
-
-
+saveRDS(all_by_plan, file.path("data", "processed", "all_stat_by_plan.Rds"))
+saveRDS(all_wide, file.path("data", "processed", "all-stat-wide.Rds"))
 
 
 

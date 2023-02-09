@@ -15,22 +15,23 @@ library(gt)
 data.dir <- file.path("data", "processed")
 
 # Read Data -------------------------------------------------------------------
-area_sf <- readRDS(file.path(data.dir, "processed-area-metadata.Rds"))
-#review  <- readRDS(file.path(data.dir, "processed-doc-review.Rds"))
+area_sf <- readRDS(file.path(data.dir, "processed-area-geometry.Rds"))
+area <- readRDS(file.path(data.dir, "processed-area-metadata.Rds"))
+review  <- readRDS(file.path(data.dir, "processed-doc-review.Rds"))
+all_wide <- readRDS(file.path(data.dir, "all-stat-wide.Rds"))
 
 # Build Data -------------------------------------------------------------------
-# Drop geometry
-area <- area_sf %>% sf::st_drop_geometry()
-
+# Any NAs in "all_wide" to zeroes
+all_wide[is.na(all_wide)] <- 0
 # New df for only the MPA areas that we found plans for
 area_found <- area[area$search == "F",]
 
 # New df only including stat (not text detail)
-#review_stat <- review[review$type == "stat",]
+review_stat <- review[review$type == "stat",]
 
 # Widen stats (every MP is a row)
-#review_stat_wide <- review_stat %>% 
-#  pivot_wider(names_from = q_code, values_from = entry, id_cols = plan_id)
+review_stat_wide <- review_stat %>% 
+  pivot_wider(names_from = q_code, values_from = entry, id_cols = plan_id)
 
 ### Add size class ----
 area_calc <- area_sf %>%
@@ -72,11 +73,12 @@ plan_table <- area_found %>%
   full_join(., plan_region) %>% 
   full_join(., plan_mpas) %>% 
   full_join(., plan_area) %>% 
+  #full_join(., all_wide) %>% 
   arrange(plan_id)
 
 plan_table %>% 
   gt() %>% 
-  tab_header(title = md("**Table X.** Metadata for management plans included in review")) %>% 
+  tab_header(title = md("**Table X.** Information for management plans included in review")) %>% 
   cols_label(plan_id = "Plan ID",
              name_plan = "Name",
              country_plan = "Country",
@@ -95,5 +97,14 @@ plan_table %>%
     data_row.padding = px(3)) %>% 
   gtsave(., filename = file.path("figs", "SI_TabX_plans.docx"))
 
+# Full Results
+plan_all <- area_found %>% 
+  select(plan_id, name_plan, country_plan, mp_year) %>% 
+  distinct() %>% 
+  full_join(., plan_region) %>% 
+  full_join(., plan_mpas) %>% 
+  full_join(., plan_area) %>% 
+  full_join(., all_wide) %>% 
+  arrange(plan_id)
 
-
+write.csv(plan_all, file.path("figs", "SI_TabX_plans_all.csv"))

@@ -154,10 +154,10 @@ g1 <- ggplot() +
        x = NULL,
        y = NULL) +
   theme_bw()+ 
-  theme(legend.position = c(0.15, 0.1),
-        legend.text=element_text(size = 8),
+  theme(legend.position = c(0.19, 0.09),
+        legend.text=element_text(size = 7),
         legend.key.size = unit(0.25, "cm"),
-        legend.margin = margin(0,5,5,2),
+        legend.margin = margin(-1,2,2,2),
         legend.background = element_rect(fill = alpha("white",0.4),
                                          color = "black")) 
 
@@ -186,14 +186,14 @@ g2 <- ggplot(mpa_df,  aes(y = Y, fill = climate_mention,
         axis.line = element_blank(),
         axis.text = element_blank(),
         axis.ticks = element_blank(),
-        plot.background = element_blank())
+        plot.background = element_rect(fill = "white"))
 g2
 
 
 library(cowplot)
 plot_grid(g1, g2, ncol = 2, align = "h", rel_widths = c(0.9, 0.1))
-ggsave(file.path("figs", "Fig1_Map_with_Density.png"),
-       width = 9, height = 4, dpi = 300)
+ggsave(file.path("figs", "Fig2_Map.png"),
+       width = 6.5, height = 3, dpi = 300)
 
 # grob1 <- ggplotGrob(g1)
 # grob2 <- ggplotGrob(g2)

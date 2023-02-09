@@ -99,6 +99,7 @@ review_stat %>%
 
 ### Add size class ----
 area_calc <- area_sf %>%
+  filter(mpa_id %in% area_found$mpa_id) %>% 
   sf::st_make_valid() %>%
   st_area() %>%
   as.numeric() %>%
