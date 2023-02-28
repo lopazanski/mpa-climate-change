@@ -42,7 +42,7 @@ data <- all_stat %>%
                                    # Monitoring
                                    "monitor_cc_explicit" = "Explicit climate change monitoring",
                                    "monitor_soc" = "Socioeconomic monitoring",
-                                   "monitor_sci" = "Scientific monitoring",
+                                   "monitor_sci" = "Ecological monitoring",
                                    "monitor_any" = "Any objectives for monitoring",
                                    # Management
                                    "mgmt_adapt_anymitigation" = "Climate mitigation strategy",
