@@ -261,7 +261,7 @@ monitor_stat <- monitor_wide %>%
   # Calculate percentages
   mutate(pct = round(n_plans/172*100, 1)) %>% 
   mutate(type = factor(case_when(stat %in% c("monitor_any", "monitor_planned") ~ "General Awareness",
-                                 stat %in% c("monitor_sci", "monitor_soc") ~ "Recommended Action",
+                                 stat %in% c("monitor_sci", "monitor_soc", "monitor_cc_implicit") ~ "Recommended Action",
                                  TRUE ~ "Climate Action"),
                        levels = c("Climate Action", "Recommended Action", "General Awareness"))) %>% 
   mutate(figure = if_else(stat %in% c("monitor_any", "monitor_sci", "monitor_soc",
