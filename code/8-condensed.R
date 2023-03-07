@@ -32,7 +32,15 @@ names <- plan_names %>%
   mutate(name_abbrev = str_replace(name_abbrev, "National Park", "NP")) %>% 
   mutate(name_abbrev = str_replace(name_abbrev, "Marine Park", "MP")) %>% 
   mutate(name_abbrev = str_replace(name_abbrev, "Biosphere Reserve", "BR")) %>% 
-  mutate(name_abbrev = str_replace(name_abbrev, "National Marine Sanctuary", "NMS"))
+  mutate(name_abbrev = str_replace(name_abbrev, "National Marine Sanctuary", "NMS")) %>% 
+  mutate(name_abbrev = str_replace(name_abbrev, "Marine National Monument", "MNM")) %>%  
+  mutate(name_abbrev = str_replace(name_abbrev, "Conservation Area", "CA")) %>%
+  mutate(name_abbrev = str_replace(name_abbrev, "Ecological Station", "ES")) %>%
+  mutate(name_abbrev = str_replace(name_abbrev, "National Wildlife Refuge", "NWR")) %>% 
+  mutate(name_abbrev = str_remove(name_abbrev, "Parks and ")) 
+  
+
+
   
 # Test region ratio
 region_count <- plan_region %>% 
@@ -94,7 +102,7 @@ data3 <- data %>%
 data3$level[is.na(data3$level)] <- "Not Included"
 
 # Plot -------------------------------------------------------------------
-theme1 <- theme(axis.text.y = element_text(size = 6),
+theme1 <- theme(axis.text.y = element_text(size = 6.5),
                 axis.text.x = element_text(size = 7, angle = 45, vjust = 1, hjust=1),
                 axis.title  = element_blank(),
                 axis.line.x = element_line(size = 0.5),
@@ -104,7 +112,8 @@ theme1 <- theme(axis.text.y = element_text(size = 6),
                 legend.key.size = unit(0.4, "cm"),
                 legend.spacing.x = unit(0.1, "cm"),
                 legend.background = element_rect(color = "black", size = 0.25),
-                strip.text = element_text(face = "bold", size = 8),
+                strip.text = element_text(face = "bold", size = 8,
+                                          margin = margin(2,2,2,2)),
                 plot.title  = element_blank(),
                 # Gridlines
                 panel.grid.major = element_blank(), 
@@ -123,7 +132,7 @@ g1 <- ggplot(data = data3 %>%
   scale_x_discrete(expand = c(0,0)) +
   scale_y_discrete(expand = c(0,0)) +
   theme1 +
-  theme(plot.margin = margin(5, 5, 5, 5))
+  theme(plot.margin = margin(5, 0, 5, -5))
 
 g1
 
@@ -141,12 +150,13 @@ g2 <- ggplot(data = data3 %>%
         legend.margin = margin(0, 5, 5, 5),
         legend.key = element_rect(colour = "grey20"),
         legend.box.margin = margin(5, 130, -5,-10),
-        plot.margin = margin(5, 5, 5, 5))
+        plot.margin = margin(5, 2, 5, -2))
 
 
 g2
 
-plot_grid(g1, g2, ncol = 2, align = "h", axis = "b")
+plot_grid(g1, NULL, g2, ncol = 3, align = "h", 
+          rel_widths = c(1, 0, 1), axis = "b")
 ggsave(file.path("figs", "Fig5_Stat_by_MPA.png"), width = 6.5, height = 8, dpi = 600)
 
 
