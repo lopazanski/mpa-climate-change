@@ -1,0 +1,826 @@
+---
+title: "MPA Management Plan Evaluation"
+author: "Cori Lopazanski"
+date: "7/21/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(janitor)
+library(sf)
+library(networkD3)
+```
+
+### 1. Create list of MPAs from MPAtlas
+
+The MPA Atlas database was used to construct a list of fully-highly protected areas from which to search for public-facing management plans. Other databases were originally explored (World Database of Protected Areas, Protected Area Management Effectiveness Database) but did not provide a comprehensive list. 
+
+The emLab Google Drive has a few copies of the dataset, here is the link to their mpa-atlas folder:
+https://drive.google.com/drive/folders/1WpDmaNoosqNt7TbT-728vmeFUeaz4udW
+
+The two versions of the data needed in this exploration document are "MPAtlas_20200407" and "mpatlas_20201223_clean". Once downloaded into the project folder they are read directly here without any external modification. Versions have also been saved locally in case they are removed from the emLab drive in the future.
+
+```{r read}
+# MPA Atlas downloaded from emlab Google Drive on April-07-2020 - original version used for this project
+mpa_atlas <- read_sf(dsn = "MPAtlas_20200407", 
+                     layer = "mpatlas_20200407_FullCalcs") %>% clean_names()
+
+# Received updated version from Juan Mayorga that he cleaned, Dec-23-2020:
+# Confirmed with Beth Pike in Aug 2021 that this version is still pretty up-to-date
+mpa_atlas2 <- read_sf(dsn = "mpatlas_20201223_clean",
+                     layer = "mpatlas_20201223_clean") 
+
+# Convert both versions to dataframes to manipulate without geometries
+atlas_df <- as.data.frame(mpa_atlas) %>% select(-geometry)
+atlas2_df <- as.data.frame(mpa_atlas2) %>% select(-geometry)
+
+# Juan Mayorga also gave me a list of "fully-highly protected" in a geopackage, but he didn't
+# share a clear process for going from the cleaned data (20201223, above) to this list, and it sounded
+# like it also included removing things based on personal knowledge; uncelar if should use/how
+#fully <- st_read("fully_highly_protected_reviewed_MPAs.gpkg") #1424 observations; seems reasonable
+
+```
+
+
+Filter to reduce the number of areas from 16,070 (original 04/2020 data) / 20933 (updated 12/2020 data)  to a more manageable number.
+
+1. Area must be implemented (not just designated). This is reported under the `implemente` column, where 1 is implemented and 0 is not implemented. Same for both versions of the database.
+    
+2. Area must be coastal or marine 
+
+- For the first examined version of the database (04/2020), this was its own variable: marine = 2, coastal = 1, neither = 0. 
+- The new version (12/2020) does not have this variable. Instead, filtered out cases where *both* the reported and calculated marine areas were equal to zero. There are often areas where the "reported" area is zero but it's actually just "not reported" and is a true MPA, so including the "calculated" metric potentially accounts for those cases because that value is calculated by MPA atlas from the geometry. 
+
+3. There must be at least one no-take area. 
+
+- Both versions report no-take as a category (`no_take`: Part, All, None, Not Reported, Not Applicable, No Applicable) and as a metric with the amount of area (`nt_area`). The area metric often seems like it may not be thoroughly reported or up-to-date.
+- The first version has an additional variable, `fishing`, which describes restrictions on fishing activities: Yes, No, Some Restrictions, Unknown, NA. When I originally examined the first version for the initial list, I added a filter in this category to accomodate differences in how the data was seemingly coded among different zones. There are many areas that are *not* categorized as part/all no-take, but the fishing category specifies otherwise (e.g. says "No Extraction", "No fishing allowed", etc.). For example, the "special research zone" in the Ross Sea Protected Area has "none" listed for `no-take` yet `fishing` lists "some restrictions" with the elaboration that there is extraction allowed for research. This is inconsistent with other areas, which are coded as completely no-take but also have stipulations that research extraction is allowed. However, this is problematic because that information is not included in the updated version of the database. 
+
+#### A. Old Database Version (04/2020) - Reduced to 1398 Areas
+
+```{r filter old database atlas_df}
+# Filter MPA Atlas dataframe
+data <- atlas_df %>% 
+  filter(implemente == 1) %>% # 1. Implemented #13117
+  filter(marine != 0) %>%  # 2. Coastal or Marine #11905
+  filter(no_take %in% c("Part", "All") | fishing %in% c("Some Restrictions", "No")) %>%  # 3a. No-take 1973
+  filter(no_take != "None") # 3b. No-take, continued - 1664 
+
+# After these three high-level filters, there are 1664 zones. At this point, I was able to 
+# look at the areas more closely and apply additional filters to weed out areas that definitively do 
+# not meet the inclusion criteria.  
+
+data_rev <- data %>% 
+  # There are several countries that have many zones which slipped through the above
+  # filter but upon closer examination consistently allow fishing. This filter excludes 
+  # zones which have not reported no-take information but listed that there are only some
+  # restrictions on fishing. BTC = bottom trawl closure
+  filter(!(fishing == "Some Restrictions" &   
+             no_take == "Not Reported" &
+             sovereign %in% c("USA", # 44 zones, restrictions on commercial and/or recreational fishing
+                            "GBR", # 12 zones, either prohibit bottom trawling or allow fishing with permit
+                            "RUS", # 12 zones, only commercial fishing prohibited
+                            "HRV", # 6 zones, only commercial fishing prohibited (recreational is regulated)
+                            "VEN", # 10 zones, BTC only
+                            "PER", # 3 zones, BTC and dynamite fishing prohibited
+                            "ISL", # 1 zone, certain species/types of fishing allowed
+                            "NOR", # 4 zones, fishing allowed with certain scallop/shrimp trawl restrictions
+                            "LTU"))) # 1 zone, fishing allowed with permission
+
+# Now, data_nt has 1428 ovservations.
+
+# Exclude US non-marine areas - since the US consistently reports the actual amount of 
+# managed marine area, can confirm that if there is no information about take, and the
+# reported marine area is zero, that it's not actually an MPA (also confirmed via review)
+data_final <- data_rev %>% 
+  filter(!(sovereign %in% c("USA") & no_take == "Not Reported" & rep_m_area == 0)) #Exclude US non-marine
+
+# Final list: 1398 observations 
+# I settled on this list for my search because it seemed reasonable (e.g. included areas seemed to fit the inclusion criteria and there weren't any glaring missing pieces from a prior knowledge/geographic standpoint) and it was also a number that was reasonably close to the number of "fully-highly protected" areas on the MPA Atlas Database website (at the time ~1200ish)
+
+# I had already started my management plan search before reaching this final list; now will add the info from the 
+# first part of the search to this completed list:
+
+# review <- read_csv("review-status.csv") %>% # read in file with info from search-so-far
+#  select(mpa_id, search:network)
+
+# add_review <- left_join(data_final, review) %>% # add review info to the final data 
+#    select(mpa_id, search:network, name:status_yea, no_take:calc_area, fishing, fishing_in)
+
+# write.csv(final, "atlas-list.csv") # write the final list to finish the search
+```
+
+#### B. New Database Version (12/2020) 
+
+In addition to getting a newer version of the database, we also learned (Aug 2021 via email with Beth Pike) that the "fully/highly" list is only those that are coded as "All" no-take. Reviews of that list (1056 zones, code below) indicate that it may be too restrictive for our purposes; 54 of the already-reviewed management plans would be excluded.
+
+```{r}
+# Read search list:
+search_list <- read_csv("list-17jan2021.csv") # search list
+all_mp_id <- data.frame("plan_id" = c(1:152)) # numeric vector with all plan id's 1-152
+
+```
+
+##### Option 1: Fully/Highly List - "All" and "Implemented"
+```{r new list option 1}
+# Filter new version of MPA Atlas Database
+# Fully/Highly protected is just no_take == "All, Implemented
+option1 <- atlas2_df %>% 
+  filter(no_take %in% c("All")) %>% 
+  filter(implemente == 1) # 1056; close to current reported 1013 zones
+
+# Overlap between the two lists
+overlap1 <- inner_join(option1, search_list, by = c("mpa_id"))  #840 overlapping areas
+overlap1_plans <- data.frame("plan_id" = as.numeric(unique(overlap1$plan_id[overlap1$search == "F"]))) #99/152 included
+
+# Extra areas not in original search
+extra1 <- option1 %>% 
+  filter(!(mpa_id %in% search_list$mpa_id)) #216 additional zones to "search" for
+
+# Which plans are excluded 
+excluded1 <- all_mp_id %>% # 53 management plans now not included
+  filter(!(plan_id %in% overlap1_plans$plan_id))
+
+# What zones are in the old list that are not in the new list?
+left1 <- search_list %>% 
+  filter(!(mpa_id %in% overlap1$mpa_id)) # 85 zones not in new list
+
+# Since 53 already-reviewed plans are excluded, this may be too restrictive for our purposes
+```
+
+##### Option 2: Include "Part" or "All" and "Implemented"
+```{r new list option 2}
+# Examine overlap and exclusions if include both "part" and "all" for no_take
+option2 <- atlas2_df %>% #20933
+  filter(implemente == 1) %>%  # 1. Implemented (step matches old version) 17793 
+  filter(no_take %in% c("Part", "All")) # 2. Part or All no-take 1665
+
+# Overlap between the two lists
+overlap2 <- inner_join(option2, search_list, by = c("mpa_id")) #1277 zones overlap
+overlap2_plans <- data.frame("plan_id" = as.numeric(unique(overlap2$plan_id[overlap2$search == "F"]))) # 148 "found" plans
+
+##### 148 found plans - the four excluded are # 145, 146, 147, 150
+
+# Extra areas not in original search
+extra2<- option2 %>% 
+  filter(!(mpa_id %in% search_list$mpa_id)) #388 additional zones to "search" for
+
+# Excluded plans
+excluded2 <- all_mp_id %>% # 2 plans not included that were already reviewed
+  filter(!(plan_id %in% overlap2_plans$plan_id))
+
+# What zones are in the old list that are not in the new list?
+left2 <- search_list %>% 
+  filter(!(mpa_id %in% overlap2$mpa_id)) # 85 zones not in new list
+
+# Export combined search list for option 2 + original list
+search_list_refined <- search_list %>% 
+  mutate(original_search = "Y") %>% # add a new column for whether included in original search
+  select(mpa_id:network, sub_locati, marine, fishing_in, original_search)
+
+option2 <- option2 %>% mutate(new_list = "Y") # add a new column for included in new search
+
+combined_option_2 <- full_join(search_list_refined, option2, by = "mpa_id") #1786
+```
+
+##### Option 3: Include other no_take criteria
+
+```{r new list option 3}
+# Filter new dataset
+option3 <- atlas2_df %>% #20933
+  filter(implemente == 1) %>%  # 1. Implemented (step matches old version) 17793 
+  filter(no_take %in% c("Part", "All") | 
+           (no_take == "Not Reported" & no_take_ar > 0) |
+           (no_take == "Not Reported" & fishing == "No"))  # 3. No-take ... 1756
+
+# What is the overlap between the old list and the new list?
+overlap3 <- inner_join(option3, search_list, by = c("mpa_id")) #1313 zones overlap 
+overlap3_plans <- data.frame("plan_id" = as.numeric(unique(overlap3$plan_id[overlap3$search == "F"]))) # 151/152 plans overlap
+
+# What zones are included in the new list that were not in the old list?
+extra3 <- option3 %>% 
+  filter(!(mpa_id %in% search_list$mpa_id)) # 443 zones not in original search
+
+# What zones are in the old list that are not in the new list?
+left3 <- search_list %>% 
+  filter(!(mpa_id %in% overlap3$mpa_id)) # 85 zones not in new list
+
+### How many of those are found plans?
+left3_found <- left3 %>% filter(search == "F") # 11 missing zones with "found" plans 
+left3_found_mp <- unique(left3_found$plan_id) # those 11 correspond to 14, 15, 73, 106, 146
+
+
+excluded3 <- all_mp_id %>% # 2 plans not included that were already reviewed
+  filter(!(plan_id %in% overlap3_plans$plan_id))
+
+```
+
+##### Option 4: Include coastal/marine proxy
+```{r}
+# Filter new dataset
+option4 <- atlas2_df %>% #20933
+  filter(implemente == 1) %>%  # Implemented (step matches old version) 17793 
+  filter(no_take %in% c("Part", "All") | 
+           (no_take == "Not Reported" & no_take_ar > 0) |
+           (no_take == "Not Reported" & fishing == "No")) %>%  #  No-take ... 1756
+  filter(calc_m_are > 0 | rep_m_area > 0) # Coastal or Marine  1215
+
+# What is the overlap between the old list and the new list?
+overlap4 <- inner_join(option4, search_list, by = c("mpa_id")) #920 zones overlap 
+overlap4_plans <- data.frame("plan_id" = as.numeric(unique(overlap4$plan_id[overlap4$search == "F"]))) # 144/152 plans overlap
+
+# What zones are included in the new list that were not in the old list?
+extra4 <- option4 %>% 
+  filter(!(mpa_id %in% search_list$mpa_id)) # 295 zones not in original search
+
+# What zones are in the old list that are not in the new list?
+left4 <- search_list %>% 
+  filter(!(mpa_id %in% overlap4$mpa_id)) # 478 zones not in new list
+
+all_mp_id <- data.frame("plan_id" = c(1:153))
+
+excluded4 <- all_mp_id %>% # 9 management plans now not included
+  filter(!(plan_id %in% overlap4_plans$plan_id)) 
+```
+
+
+##### Option 5: Include "is mpa" proxy
+```{r}
+# Filter new dataset
+option5 <- atlas2_df %>% #20933
+  filter(implemente == 1) %>%  # Implemented (step matches old version) 17793 
+  filter(no_take %in% c("Part", "All") | 
+           (no_take == "Not Reported" & no_take_ar > 0) |
+           (no_take == "Not Reported" & fishing == "No")) %>%  #  No-take ... 1756
+  filter(is_mpa == 1) # Coastal or Marine  1673
+
+# What is the overlap between the old list and the new list?
+overlap5 <- inner_join(option5, search_list, by = c("mpa_id")) #1313 zones overlap 
+overlap5_plans <- data.frame("plan_id" = as.numeric(unique(overlap5$plan_id[overlap5$search == "F"]))) # 151/152 plans overlap
+
+# What zones are included in the new list that were not in the old list?
+extra5 <- option5 %>% 
+  filter(!(mpa_id %in% search_list$mpa_id)) # 360 zones not in original search
+
+# What zones are in the old list that are not in the new list?
+ left5 <- search_list %>% 
+  filter(!(mpa_id %in% overlap5$mpa_id)) # 478 zones not in new list
+
+excluded5 <- all_mp_id %>% # 9 management plans now not included
+  filter(!(plan_id %in% overlap5_plans$plan_id)) 
+```
+
+##### Option 6: Include "is mpa" proxy but only part/all 
+```{r}
+# Filter new dataset
+option6 <- atlas2_df %>% #20933
+  filter(implemente == 1) %>%  # Implemented (step matches old version) 17793 
+  filter(no_take %in% c("Part", "All")) %>%  #  No-take 
+  filter(is_mpa == 1) # Is mpa #1592
+
+# What is the overlap between the old list and the new list?
+overlap6 <- inner_join(option6, search_list, by = c("mpa_id")) #1313 zones overlap 
+overlap6_plans <- data.frame("plan_id" = as.numeric(unique(overlap6$plan_id[overlap6$search == "F"]))) # 151/152 plans overlap
+
+# What zones are included in the new list that were not in the old list?
+extra6 <- option6 %>% 
+  filter(!(mpa_id %in% search_list$mpa_id)) # 360 zones not in original search
+
+# What zones are in the old list that are not in the new list?
+left6 <- search_list %>% 
+  filter(!(mpa_id %in% overlap6$mpa_id)) # 478 zones not in new list
+
+excluded6 <- all_mp_id %>% # 9 management plans now not included
+  filter(!(plan_id %in% overlap6_plans$plan_id)) 
+```
+
+##### Option 7: Include "is mpa" proxy but only part/all 
+```{r}
+# Filter new dataset
+option7 <- atlas2_df %>% #20933
+  filter(implemente == 1) %>%  # Implemented (step matches old version) 17793 
+  filter(no_take %in% c("Part", "All")) %>%  #  No-take 
+  filter(is_mpa == 1) %>%  # Is mpa #1592
+  filter(calc_m_are > 0 | rep_m_area > 0) #1087
+
+# What is the overlap between the old list and the new list?
+overlap7 <- inner_join(option7, search_list, by = c("mpa_id")) #1313 zones overlap 
+overlap7_plans <- data.frame("plan_id" = as.numeric(unique(overlap7$plan_id[overlap7$search == "F"]))) # 151/152 plans overlap
+
+# What zones are included in the new list that were not in the old list?
+extra7 <- option7 %>% 
+  filter(!(mpa_id %in% search_list$mpa_id)) # 360 zones not in original search
+
+# What zones are in the old list that are not in the new list?
+left7 <- search_list %>% 
+  filter(!(mpa_id %in% overlap7$mpa_id)) # 478 zones not in new list
+
+left_new7 <- atlas2_df %>% 
+  filter(mpa_id %in% left7$mpa_id)
+
+excluded7 <- all_mp_id %>% # 9 management plans now not included
+  filter(!(plan_id %in% overlap7_plans$plan_id)) 
+
+# This is probably not worth it - only leads to 6 fewer additional plans to review
+
+
+```
+
+
+##### Compare the "Extra" areas among the different options
+```{r}
+add_part <- extra2 %>% filter(!(mpa_id %in% extra1$mpa_id)) # All 216 from "All" plus 172
+add_nt <- extra3 %>% filter(!(mpa_id %in% extra2$mpa_id)) # All 216 from "All" plus 172 from "Part" plus 55 
+add_cm1 <- extra4 %>% 
+  filter(mpa_id %in% extra1$mpa_id) # 148/216 from "All" 
+add_cm2 <- extra4 %>% 
+  filter(mpa_id %in% add_part$mpa_id)  # 119/172 from 'Part"
+add_cm3 <- extra4 %>% 
+  filter(mpa_id %in% add_nt$mpa_id) # 28/55 from extra no-take criteria
+
+add_ismpa1 <- extra5 %>% 
+  filter(mpa_id %in% extra1$mpa_id) #197/216 from "All"
+add_ismpa2 <- extra5 %>% # 118/172 from "Part"
+  filter(mpa_id %in% add_part$mpa_id)
+add_ismpa3 <- extra5 %>% #45/55 from extra no-take criteria
+  filter(mpa_id %in% add_nt$mpa_id)
+
+op6_1 <- extra6 %>% 
+  filter(mpa_id %in% extra1$mpa_id) #197
+op6_2 <- extra6 %>% 
+  filter(mpa_id %in% add_part$mpa_id) #118
+  
+
+  
+# Which of the "All" no take areas get knocked out by the "is_mpa" criteria?
+all_notmpa <- extra1 %>% 
+  filter(!(mpa_id %in% extra5$mpa_id))
+# Some make sense, some don't - PIPA entry, Tubbataha Reef entry, some Red Hind Spawning Areas, others
+
+# 148 areas are shared by all of the criteria: add_cm1
+write.csv(add_cm1, "export-addcm1-148.csv")
+temp <- extra6 %>% 
+  filter(!(mpa_id %in% add_cm1$mpa_id))
+write.csv(temp, "extra-op6.csv")
+
+temp2 <- add_cm1 %>% 
+  filter(!(mpa_id %in% extra6$mpa_id))
+```
+
+
+### 2. Results
+
+#### A. Read Data 
+
+Info was entered on Google Sheets during the management plan search and as each plan was reviewed. Each sheet was then downloaded individually at the end of the search and review process (January 2021)
+
+```{r read result data}
+# Read the mpa-info data (details extracted from each management plan)
+prelim <- read_csv("mpa-info-20jan21.csv") %>% 
+  na_if("NR")  # "Needs Review" should be treated as NA
+  
+# Read the list-final data (details from the management plan search)
+list <- read_csv("list-17jan2021.csv") %>% 
+  clean_names() %>% 
+  na_if("NA") %>% 
+  mutate(plan_id = as.numeric(plan_id))
+
+
+# Combine data and list to one output file for mapping (3/11/2021)
+all <- full_join(prelim, list, by = c("obs_id" = "plan_id"))
+# write.csv(all, "combined-info-3mar21.csv")
+
+# Read the strategy-collection
+# strategies <- read_csv("mpa_strat_10dec2020.csv")
+
+```
+
+#### B. Wrangle Data 
+
+- Added size classes for the reported data (collected by Cori and added to the size and nt_size columns in the mpa info list) and the calculated marine area in the search list (reported by MPA Atlas)
+
+```{r wrangle}
+# Steps to correct discrepancies or add changes in one place prior to all analyses; avoid changing names 
+# or updating processes later
+
+data <- prelim %>% 
+  # Make size numeric (only characters in the variable are NS and "Not Stated", which is not important)
+  mutate(size = as.numeric(size),
+         nt_size = as.numeric(nt_size)) %>% 
+  # Create columns that add size classes for both "size" and "no-take size" based on MPA Atlas size designations
+  mutate(size_cat = factor(case_when(size < 10 ~ "very small",
+                                     between(size, 10, 100) ~ "small",
+                                     between(size, 100, 100000) ~ "large",
+                                     size > 100000 ~ "very large"),
+                           levels = c("very small", "small", "large", "very large")),
+         nt_size_cat = factor(case_when(nt_size < 10 ~ "very small",
+                                        between(nt_size, 10, 100) ~ "small",
+                                        between(nt_size, 100, 100000) ~ "large",
+                                        nt_size > 100000 ~ "very large"),
+                              levels = c("very small", "small", "large", "very large"))) %>% 
+  # Calculate proportion of the total region that is no-take
+  mutate(nt_percent = nt_size/size*100)
+  
+
+list <- list %>% 
+  # Add same size categories as above to the search list (more accurate, probably)
+  mutate(size_cat = factor(case_when(calc_m_are < 10 ~ "very small",
+                              between(calc_m_are, 10, 100) ~ "small",
+                              between(calc_m_are, 100, 100000) ~ "large",
+                              calc_m_are > 100000 ~ "very large"),
+                           levels = c("very small", "small", "large", "very large")))
+
+```
+
+
+
+#### C. Overview and Metadata Exploration (Areas, Regions, Countries, Size)
+
+##### *How many individual named areas are covered in the management plan search?*
+
+There is a degree of duplication in the database because each observation is a polygon, so depending on how the information was entered into the database a single MPA can sometimes have several observations (but all technically one name)
+```{r}
+areas <- list %>% 
+  select(name, country) %>% 
+  distinct()
+
+print(nrow(areas))
+```
+
+##### *How many individual observations does each management plan cover?*
+
+Some management plans are regional, so a single plan could cover many observations from the original search list.
+
+```{r}
+num_areas <- data %>% 
+  group_by(num_areas) %>% 
+  count()
+
+print(num_areas)
+```
+
+##### *How are the reviewed plans distributed across ocean regions?*
+
+This table reports the number of plans reviewed for each ocean region - `region` was categorized during management plan review based on the actual location of the managed area
+
+```{r}
+region <- data %>% 
+  group_by(region) %>% 
+  count()
+
+print(region)
+```
+
+##### *How are the reviewed included areas distributed across ocean regions?*
+
+This table uses the management plan ID to count the number of observations from the search list that are reviewed for each region. While the previous table reports number of reviewed plans for each region, this table reports the number of included areas for each region. NA here are most likely those which 
+
+```{r}
+plan_region <- data %>% select(obs_id, region) %>% 
+  mutate(plan_id = as.numeric(obs_id)) # create new column plan_id to match the list df
+
+list_region <- list %>% mutate(plan_id = as.numeric(plan_id)) %>% 
+  filter(search == "F") # only include areas where plans were located
+
+# Append the region associated with each management plan ID to the original search list
+# Then, count the number of observations for each region
+area_region <- full_join(list_region, plan_region, by = "plan_id") %>% 
+  group_by(region) %>% 
+  count()
+
+print(area_region)
+```
+
+##### *How many reviewed management plans for each country?*
+
+```{r}
+# Number of plans for each country:
+countries <- data %>% 
+  group_by(country) %>% 
+  count()
+
+print(countries)
+
+# Number of areas for each country:
+area_country <- list %>% 
+  filter(search == "F") %>% 
+  group_by(country) %>% 
+  summarize(total_areas = n())
+
+print(area_country)
+```
+
+##### *What year were the management plans published?*
+
+```{r}
+# Year Published
+publish <- data %>% 
+  group_by(mp_year) %>% 
+  count()
+
+ggplot(data = data) +
+  geom_histogram(aes(x = mp_year)) + 
+  labs(x = "Management Plan Publication Year",
+       y = "Count") +
+  theme_minimal()
+
+#ggsave("year_pub_hist.png", width = 3.5, height = 2.5, units = "in")
+```
+
+
+##### *What size are the reviewed areas?*
+
+1. Size of entire managed area (based on information collected from management plans or all areas combined)
+```{r}
+# Size of managed area vs no-take area
+ggplot(data = data %>% filter(!is.na(size_cat)), aes(x = size_cat)) +
+  geom_bar()+ 
+  geom_text(stat = "count", aes(label =..count..), vjust = -0.4) +
+  scale_y_continuous(limits = c(0, 80), expand = c(0,0))+
+  labs(x = "size class for entire management area",
+       y = "number of management plans") +
+  theme_classic()
+#ggsave("size_entire.png", width = 3, height = 3, units = "in")
+```
+
+2. Size of no-take area (based on info collected from management plans)
+```{r}
+ggplot(data = data %>% filter(!is.na(nt_size_cat)), aes(x = nt_size_cat)) +
+  geom_bar() +
+  geom_text(stat = "count", aes(label =..count..), vjust = -0.5) +
+  scale_y_continuous(limits = c(0, 50), expand = c(0,0))+
+  labs(x = "size class for no-take area",
+       y = "number of management plans") +
+  theme_classic()
+#ggsave("size_nt.png", width = 3, height = 3, units = "in")
+```
+
+3. Size of individual zones across all reviewed plans
+```{r}
+# Size of individual zones across all reviewed plans
+ggplot(data = list %>% filter(search == "F"), aes(x = size_cat)) +
+  geom_bar() +
+  geom_text(stat = "count", aes(label =..count..), vjust = -0.5) +
+  scale_y_continuous(limits = c(0, 200), 
+                     expand = c(0,0))+
+  labs(x = "size class for individual zones included within management plans",
+       y = "number of individual zones") +
+  theme_classic()
+
+#ggsave("size_zones.png", width = 5, height = 3, units = "in")
+```
+
+##### *What is the distribution of the proportion of area that is no-take within each reviewed management plan?*
+
+```{r}
+ggplot(data = data) +
+  geom_histogram(aes(x = nt_percent), breaks = c(0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100))
+```
+
+#### D. Climate Change Overview
+
+##### *How many plans mention climate change?*
+```{r}
+ggplot(data = data, aes(x = cc_threat)) +
+  geom_bar() +
+  geom_text(stat = "count", aes(label =..count..), vjust = -0.5) +
+  labs(
+    x = "Does the plan mention climate change?",
+    y = "number of management")
+
+```
+
+##### *How many AREAS mention climate change?*
+
+```{r}
+ggplot(data = all, aes(x = cc_threat)) +
+  geom_bar()+
+  geom_text(stat = "count", aes(label =..count..), vjust = -0.5)
+```
+
+
+##### *Does mention of climate change increase/decrease by year?* 
+```{r}
+threat <- data %>% 
+  group_by(mp_year, cc_threat) %>% 
+  count() 
+
+threat_prop <- threat %>% 
+  pivot_wider(names_from = cc_threat,
+              values_from = n) %>% 
+  mutate_all(~replace(., is.na(.), 0)) %>% 
+  mutate(prop = Yes/(Yes+No))
+
+ggplot(data = threat) +
+  geom_point(aes(x = mp_year, y = n, color = cc_threat)) +
+  labs(x = "management plan year", y = "number of plans")+
+  theme_minimal()+
+  theme(
+    legend.title = element_blank())
+
+ggplot(data = threat_prop) +
+  geom_point(aes(x = mp_year, y = prop))+
+    labs(x = "management plan year", y = "proportion of plans that mention climate change")+
+  theme_minimal()
+```
+
+##### *How many plans have specific, detailed climate change action plans?*
+```{r}
+ap <- data %>% 
+  group_by(cc_ap) %>% 
+  count()
+
+print(ap)
+```
+
+
+#### E. Objectives
+
+##### *Are there climate change objectives?*
+```{r}
+ggplot(data = data %>% filter(cc_threat == "Yes"), aes(x = cc_obj)) +
+  geom_bar() +
+  geom_text(stat = "count", aes(label =..count..), vjust = -0.5)+
+  labs(x = NULL,
+       title = "excluding plans that don't mention climate change")
+
+ggplot(data = data, aes(x = cc_obj)) +
+  geom_bar() +
+  geom_text(stat = "count", aes(label =..count..), vjust = -0.5)+
+  labs(x = NULL,
+       title = "including plans that don't mention climate change")
+```
+
+
+#### F. Vulnerability Assessments
+
+##### *How many plans have conducted vulnerability assessments?*
+```{r}
+vuln <- data %>% 
+  group_by(cc_va, other_assess) %>% 
+  count()
+
+print(vuln)
+rm(vuln)
+
+all_assess <- data %>% 
+  filter(cc_va %in% c("Yes", "Planned") | other_assess %in% c("Yes", "Planned"))
+
+print(all_assess)
+rm(all_assess)
+```
+
+#### G. Design
+
+##### *Does the plan include adaptive design?*
+```{r}
+design_df <- data %>% 
+  mutate(adap_cat = case_when(adap_design == "Zoning" ~ "adaptive",
+                              adap_design == "Redesign" ~ "adaptive",
+                              adap_design == "Not Zoning" ~ "not adaptive",
+                              adap_design == "NS" ~ "not adaptive",
+                              is.na(adap_design) ~ "not adaptive"),
+         adap_spec = case_when(adap_design == "Zoning" ~ "zoning",
+                              adap_design == "Redesign" ~ "re-design",
+                              adap_design == "Not Zoning" ~ "no adaptive design",
+                              adap_design == "NS" ~ "no adaptive design",
+                              is.na(adap_design) ~ "no adaptive manaagement")) %>% 
+  group_by(adap_cat, adap_spec) %>% 
+  count()
+
+print(design_df)
+
+ggplot(data = design_df, aes(x = adap_cat, y = n, fill = adap_spec))+
+  geom_bar(position = "stack", stat = "identity")+
+  scale_y_continuous(limits = c(0, 110),
+                     expand = c(0,0))+
+  labs(x = "protected area design",
+       y = "number of management plans")+
+  theme_classic()+
+  theme(legend.position = "none")
+  
+#ggsave("adaptive_design.png", width = 3, height = 3, units = "in")
+```
+
+##### Adaptive design sankey diagram:
+```{r}
+# Create dataframe that links the flows and intensities from the 'design_df'
+links <- data.frame(
+  source = c("All Management Plans", "All Management Plans",
+             "Adaptive Management", "Adaptive Management",
+             "Adaptive Design", "Adaptive Design"),
+  target = c("Adaptive Management", "No Adaptive Management", 
+             "Adaptive Design", "No Adaptive Design", 
+             "Re-Design", "Zoning"),
+  value = c(85, 67, 53, 32, 11, 42))
+ 
+# From these flows we need to create a node data frame: it lists every entities involved in the flow
+nodes <- data.frame(
+  name=c(as.character(links$source), 
+  as.character(links$target)) %>% unique())
+ 
+# With networkD3, connection must be provided using id, not using real name like in the links dataframe.. 
+# So we need to reformat it.
+links$IDsource <- match(links$source, nodes$name)-1 
+links$IDtarget <- match(links$target, nodes$name)-1
+ 
+# Make the Network
+p <- sankeyNetwork(Links = links, Nodes = nodes,
+              Source = "IDsource", Target = "IDtarget",
+              Value = "value", NodeID = "name",
+              sinksRight = FALSE,
+              fontSize = 12)
+p
+
+```
+
+
+
+#### H. Monitoring
+
+```{r}
+sci_monitor <- data %>% 
+  group_by(sci_monitor) %>% 
+  count()
+
+soc_monitor <- data %>% 
+  group_by(social_monitor) %>% 
+  count()
+
+cc_monitor <- data %>% 
+  filter(sci_monitor != "NS") %>% 
+  group_by(cc_monitor) %>% 
+  count()
+
+monitoring_id <- data %>% 
+  filter(sci_monitor == "ID" | soc_monitor %in% c("ID", "In development"))
+
+```
+
+
+#### I. Management
+
+##### *How many plans have adaptive management?*
+
+```{r}
+adapt <- data %>% 
+  group_by(adap_man) %>% 
+  count()
+
+print(adapt)
+```
+
+##### *How many plans are integrated within surrounding management frameworks?*
+```{r}
+integrated <- data %>% 
+  group_by(int_man) %>% 
+  count()
+
+print(integrated)
+```
+
+##### *How many plans have other climate change actions?*
+```{r}
+actions <- data %>% 
+  group_by(cc_actions) %>% 
+  count()
+
+print(actions)
+```
+
+##### *How many years do the management plans span?*
+```{r}
+timeline <- data %>% 
+  group_by(mp_time) %>% 
+  count()
+
+print(timeline)
+rm(timeline)
+
+ggplot(data = data %>% 
+         mutate(mp_time_fct = factor(mp_time,
+                                     levels = c("1", "2", "3", "4", "5", "6", 
+                                                "10", "15", "20", "NS"))), aes(x = mp_time_fct)) +
+  geom_bar() +
+  geom_text(stat = "count", aes(label =..count..), vjust = -0.5) +
+  scale_y_continuous(limits = c(0, 68),
+                     expand = c(0,0))+
+  labs(x = "number of years outlined before complete management plan update",
+       y = "number of plans")+
+  theme_classic()
+  
+# ggsave("plan_update.png", width = 5, height = 3, units = "in")
+```
+
+##### *What is the average number of years between management plan updates?*
+
+```{r}
+avg_mp_time <- data %>%
+  mutate(mp_time = as.numeric(mp_time))
+
+mean(avg_mp_time$mp_time, na.rm = TRUE)
+```
+
+
