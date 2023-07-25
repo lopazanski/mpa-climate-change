@@ -19,7 +19,8 @@ Please contact lopazanski@ucsb.edu with any questions.
     <li>5-map: builds Figure 2
     <li>6-stat-details-section3: all stats for results section
     <li>7-main-stat-figure: builds figure 3
-    <li>8-condensed: builds figure 4
+    <li>8-threats: builds figure 4
+    <li>9-condensed: builds figure 5
   </ul>   
 <li><b>data</b>: 
    <ul>
