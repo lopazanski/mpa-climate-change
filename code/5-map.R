@@ -212,3 +212,44 @@ ggsave(file.path("figs", "Fig2_Map.png"),
 # 
 # grid::grid.newpage()
 # grid::grid.draw(g)
+
+# Build presentation version of map (no gray dots, adjusted dimensions and quality)
+# Build map 
+g3 <- ggplot() +
+  # Basemap with dark countries and white outlines
+  geom_polygon(data = world_data,
+               aes(x = long, y = lat, group = group),
+               fill = "grey85", color = "grey95", lwd = 0.1) +
+  # Points for each MPA
+  geom_point(data = mpa_df %>% filter(!is.na(climate_mention)),
+             aes(x = X, y = Y, col = climate_mention),
+             alpha = 0.4, size = 2) + 
+  # Colors with colorblind friendly red/blue
+  scale_color_manual(values = c("#D81B60", "#1E88E5"),
+                     labels = c("Plan does not mention climate change", # legend labels
+                                "Plan mentions climate change")) +
+  # Set axes
+  scale_x_continuous(limits = c(-185, 185), expand = c(0,0),
+                     breaks = c(-180, -150, -120, -90, -60, -30, 0, 30, 60, 90, 120, 150, 180),
+                     labels = lon_labels)+
+  scale_y_continuous(limits = c(-89, 89), expand = c(0,0),
+                     breaks = c(-60, -30, 0, 30, 60),
+                     labels = lat_labels) +
+  # Formatting
+  labs(color = NULL,
+       x = NULL,
+       y = NULL) +
+  theme_bw()+ 
+  theme(axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        legend.position = c(0.19, 0.09),
+        legend.text=element_text(size = 9),
+        legend.key.size = unit(0.25, "cm"),
+        legend.margin = margin(1,2,2,2),
+        legend.background = element_rect(fill = alpha("white",0.4),
+                                         color = "black"),
+        plot.background = element_rect(fill = "white", color = NA))
+g3
+
+ggsave(file.path("figs", "Fig2_Map_Adjusted.png"),
+       width = 8, height = 4, dpi = 600)
